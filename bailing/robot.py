@@ -649,8 +649,14 @@ class StreamRobot(Robot):
         self.stream_player = PygameStreamPlayer()
         self.stream_tts_config = config["TTS"][selected_tts]
         self.stream_buffer_duration = self.stream_tts_config.get("stream_buffer_duration", 0.3)
+        
+        # 首次缓冲机制 - 从 TTS 配置中读取
+        self.is_first_buffer = True  # 是否是首次缓冲
+        self.first_buffer_start_time = 0.0  # 首次缓冲开始时间
+        self.first_buffer_duration = self.stream_tts_config.get("first_buffer_duration", 2.0)  # 首次超长缓冲时间（秒），默认2秒
+        
         self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
-        logger.info(f"已启用流式TTS模式，首次对话自动建连，缓冲时间: {self.stream_buffer_duration}秒")
+        logger.info(f"已启用流式TTS模式，首次对话自动建连，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒")
 
     def _tts_priority(self) -> None:
         def shutdown_watcher():
@@ -678,6 +684,11 @@ class StreamRobot(Robot):
             self.current_tts_stream = None
         self.stream_player.clear_buffer()
         self._tts_initialized = False
+        # 重置首次缓冲状态
+        self.is_first_buffer = True
+        self.first_buffer_start_time = 0.0
+        self.stream_buffer = ""
+        self.last_stream_flush_time = time.time()
 
     def _chat_handle_token(self, content: str) -> None:
         if not self._tts_initialized and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY and content.strip():
@@ -686,24 +697,55 @@ class StreamRobot(Robot):
 
         if self.current_tts_stream is not None and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
             self._check_and_reconnect_stream()
-
             self.stream_buffer += content
             current_time = time.time()
-
-            if current_time - self.last_stream_flush_time >= self.stream_buffer_duration:
-                filtered_content = self.stream_buffer.replace(self.EXIT_TOKEN, "")
-                if not self.start_task_mode:
-                    filtered_content = re.sub(r'```json.*?```', '', filtered_content, flags=re.DOTALL)
-                    filtered_content = re.sub(r'\{\"function_name\".*?\}', '', filtered_content, flags=re.DOTALL)
-
-                if filtered_content.strip() and self.current_tts_stream is not None and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
-                    try:
-                        self.current_tts_stream.append_text(filtered_content)
-                    except Exception as e:
-                        logger.error(f"发送缓冲内容到TTS失败: {e}")
-
-                self.stream_buffer = ""
-                self.last_stream_flush_time = current_time
+            
+            if self.is_first_buffer:
+                self._process_first_buffer(current_time)
+            else:
+                self._process_normal_buffer(current_time)
+    
+    def _process_first_buffer(self, current_time: float) -> None:
+        """处理首次缓冲：超长等待并过滤特殊token"""
+        if self.first_buffer_start_time == 0:
+            self.first_buffer_start_time = current_time
+            logger.debug(f"首次缓冲开始，等待{self.first_buffer_duration}秒检查特殊token")
+        
+        # 首次缓冲必须等待足够时间
+        if current_time - self.first_buffer_start_time >= self.first_buffer_duration:
+            self._send_buffer_content(is_first=True)
+            self.is_first_buffer = False
+    
+    def _process_normal_buffer(self, current_time: float) -> None:
+        """处理普通缓冲：时间或字数触发"""
+        if (current_time - self.last_stream_flush_time >= self.stream_buffer_duration 
+            or len(self.stream_buffer) >= 5):
+            self._send_buffer_content(is_first=False)
+    
+    def _send_buffer_content(self, is_first: bool = False) -> None:
+        """过滤并发送缓冲池内容到TTS"""
+        filtered_content = self._filter_special_tokens(self.stream_buffer)
+        
+        if (filtered_content.strip() 
+            and self.current_tts_stream is not None 
+            and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY):
+            try:
+                self.current_tts_stream.append_text(filtered_content)
+                if is_first:
+                    logger.debug(f"首次缓冲发送完成，过滤前:{len(self.stream_buffer)}字，过滤后:{len(filtered_content)}字")
+            except Exception as e:
+                logger.error(f"发送缓冲内容到TTS失败: {e}")
+        
+        self.stream_buffer = ""
+        self.last_stream_flush_time = time.time()
+    
+    def _filter_special_tokens(self, content: str) -> str:
+        """过滤特殊token"""
+        filtered = content.replace(self.EXIT_TOKEN, "")
+        if not self.start_task_mode:
+            filtered = re.sub(r'```json.*?```', '', filtered, flags=re.DOTALL)
+            filtered = re.sub(r'\{\"function_name\".*?\}', '', filtered, flags=re.DOTALL)
+        return filtered
 
     def _init_stream_connection(self) -> None:
         try:
@@ -749,15 +791,16 @@ class StreamRobot(Robot):
     def _chat_flush_tts(self) -> None:
         if self.current_tts_stream is not None and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
             if self.stream_buffer.strip():
-                filtered_content = self.stream_buffer.replace(self.EXIT_TOKEN, "")
-                if not self.start_task_mode:
-                    filtered_content = re.sub(r'```json.*?```', '', filtered_content, flags=re.DOTALL)
-                    filtered_content = re.sub(r'\{\"function_name\".*?\}', '', filtered_content, flags=re.DOTALL)
+                filtered_content = self._filter_special_tokens(self.stream_buffer)
                 if filtered_content.strip():
                     try:
                         self.current_tts_stream.append_text(filtered_content)
+                        if self.is_first_buffer:
+                            logger.debug(f"首次缓冲提前刷新发送，过滤前:{len(self.stream_buffer)}字，过滤后:{len(filtered_content)}字")
                     except Exception as e:
                         logger.error(f"发送剩余缓冲内容到TTS失败: {e}")
+            # 无论如何，刷新时结束首次缓冲模式
+            self.is_first_buffer = False
             self.stream_buffer = ""
             self.last_stream_flush_time = time.time()
         if self.tts_consecutive_fail_count >= self.MAX_TTS_RETRY:

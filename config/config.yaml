@@ -16,8 +16,10 @@ selected_module:
   ASR: FunASR
   VAD: SileroVAD
   LLM: OpenAILLM # 可选 LocalLLM(本地模型) 或 OpenAILLM(云端模型)
-  TTS: Qwen3TTS
-  Player: PygamePlayer
+  TTS: QwenTtsRealtimeAPI
+  Player: PygamePlayer # 会自行选择无需配置
+
+
 
 Recorder:
   RecorderPyAudio:
@@ -60,6 +62,7 @@ TTS:
     url: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime" # 国内节点，新加坡节点用wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime
     output_dir: tmp/
     disable_tts_sentence_buffer: true # 禁用服务端标点分句缓冲，强制收到文本就立刻合成，降低首字延迟
+    first_buffer_duration: 2.0 # 首次缓冲时间（秒），用于充分过滤特殊token，之后恢复正常缓冲
 
 Player:
   # 普通文件播放器
