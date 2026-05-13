@@ -1,0 +1,98 @@
+name: 百聆（bailing）
+version: 1.0
+
+logging:
+  level: info
+
+# 唤醒词
+WakeWord: 百聆
+
+interrupt: true
+# 是否开启工具调用
+StartTaskMode: False
+# 具体处理时选择的模块
+selected_module:
+  Recorder: RecorderPyAudio
+  ASR: FunASR
+  VAD: SileroVAD
+  LLM: OpenAILLM # 可选 LocalLLM(本地模型) 或 OpenAILLM(云端模型)
+  TTS: Qwen3TTS
+  Player: PygamePlayer
+
+Recorder:
+  RecorderPyAudio:
+    output_file: tmp/
+
+ASR:
+  FunASR:
+    model_dir: models/SenseVoiceSmall
+    output_file: tmp/
+
+VAD:
+  SileroVAD:
+    sampling_rate: 16000
+    threshold: 0.80
+    min_silence_duration_ms: 1500  # 如果说话停顿比较长，可以把这个值设大一些
+
+LLM:
+  OpenAILLM:
+    model_name: deepseek-v4-flash
+    url: https://api.deepseek.com
+    api_key: "sk-6c1f8f9020774dda903a836131038034"
+  LocalLLM:
+    # 兼容所有OpenAI格式的本地推理服务：Ollama、vLLM、LM Studio、FastChat、Text Generation WebUI等
+    model_name: qwen2.5
+    url: http://localhost:11434/api/chat
+    # api_key: "sk-xxx" # 可选，vLLM等需要API密钥的服务填这里，不需要可以留空或注释
+
+TTS:
+  Qwen3TTS:
+    model_path: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+    ref_audio: D:\bailing-main\voice_design_reference.wav
+    ref_text: 你好我是你的私人秘书请问有什么可以帮助到你的吗？
+    language: Chinese
+    output_dir: tmp/
+    dtype: bfloat16
+  QwenTtsRealtimeAPI:
+    api_key: "sk-0aa1aba2cc5446fcb562ba1ea7f4ff0c" # 替换成你自己的阿里云百炼API Key
+    model: "qwen3-tts-flash-realtime" # 实时版本速度更快，延迟低
+    voice: "Cherry" # 官方音色：Cherry/Alvin/Stella/Bella/Molly/Ryan/Stanley/Adam
+    url: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime" # 国内节点，新加坡节点用wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime
+    output_dir: tmp/
+    disable_tts_sentence_buffer: true # 禁用服务端标点分句缓冲，强制收到文本就立刻合成，降低首字延迟
+
+Player:
+  # 普通文件播放器
+  PygamePlayer: null
+  # 流式PCM播放器（边接收边播放，无文件落地）
+  PygameStreamPlayer:
+    sample_rate: 24000  # 采样率，默认24000适配Qwen流式TTS
+    channels: 1  # 声道数
+
+Rag:
+  doc_path: documents/
+  emb_model: models/bge-small-zh
+  model_name: deepseek-chat
+  url: https://api.deepseek.com
+  api_key: "sk-6c1f8f9020774dda903a836131038034"
+
+Memory:
+  dialogue_history_path: tmp/
+  memory_file: tmp/memory.json
+  model_name: deepseek-chat
+  url: https://api.deepseek.com
+  api_key: "sk-6c1f8f9020774dda903a836131038034"
+
+TaskManager:
+  functions_call_name: plugins/function_calls_config.json
+  aigc_enabled: false
+
+
+
+# 缓冲音效配置：LLM响应等待时播放
+BufferSound:
+  enabled: true # 是否开启缓冲音效
+  threshold_length: 5 # 问题长度超过这个字数就播放缓冲音效（可调整）
+  file_prefix: "voice" # 音效文件名前缀，比如voice1.wav voice2.wav
+  file_dir: "voice_cache" # 音效存放目录
+  pause_after_buffer: 0.5 # 缓冲音效结束后到TTS开始的停顿时间，单位秒（0就是不停顿）
