@@ -1,0 +1,496 @@
+2026-05-12 19:42:43 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-12 19:42:43 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.36s
+2026-05-12 19:42:43 - root - INFO - download models from model hub: hf
+2026-05-12 19:42:44 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-12 19:42:44 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-12 19:42:44 - root - INFO - scope_map: ['module.', 'None']
+2026-05-12 19:42:44 - root - INFO - excludes: None
+2026-05-12 19:42:44 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-12 19:42:44 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.05s
+2026-05-12 19:42:44 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.04s
+2026-05-12 19:42:44 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-12 19:42:45 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-12 19:42:45 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-12 19:42:45 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-12 19:42:45 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:42:45 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:42:45 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-12 19:42:45 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-12 19:42:46 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-12 19:42:46 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-12 19:42:47 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-12 19:42:47 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.51s
+2026-05-12 19:42:47 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.04s
+2026-05-12 19:42:47 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.38s
+2026-05-12 19:42:47 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-12 19:42:47 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.38s
+2026-05-12 19:42:47 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-12 19:42:47 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-12 19:42:47 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-12 19:42:47 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-12 19:42:47 - bailing.robot - INFO - Started recording.
+2026-05-12 19:42:47 - bailing.player - INFO - 正在播放启动音效...
+2026-05-12 19:42:47 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-12 19:42:55 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@85d0afe7d54d4ecebea5ada8af231b5c.wav
+2026-05-12 19:42:56 - bailing.asr - INFO - 识别文本: 关闭程序。
+2026-05-12 19:42:58 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，塔菲这就关闭啦。下次再找我玩哦，拜拜！
+2026-05-12 19:42:58 - bailing.robot - INFO - [LLM回答] 好的，塔菲这就关闭啦。下次再找我玩哦，拜拜！
+2026-05-12 19:43:09 - bailing.robot - INFO - LLM回答生成完成，总长度22字，已加入TTS任务队列
+2026-05-12 19:43:09 - bailing.robot - INFO - 回答完成，总长度: 22 字
+2026-05-12 19:43:09 - bailing.robot - INFO - 检测到用户退出意图，程序即将关闭...
+2026-05-12 19:43:09 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 19:43:09 - bailing.robot - INFO - 告别语音播放完成
+2026-05-12 19:43:09 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-12 19:43:09 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_19-42-47.json
+2026-05-12 19:43:09 - bailing.robot - INFO - 对话数据保存完成
+2026-05-12 19:43:09 - bailing.memory - INFO - 发现1个未处理的对话文件，正在重新生成记忆...
+2026-05-12 19:43:19 - bailing.memory - INFO - 记忆更新完成！已处理1个会话，新记忆长度：763字
+2026-05-12 19:43:19 - bailing.robot - INFO - 记忆更新完成
+2026-05-12 19:43:19 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-12 19:43:19 - bailing.robot - ERROR - TTS 任务出错: 
+2026-05-12 19:43:19 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 19:43:19 - bailing.robot - INFO - 告别语音播放完成
+2026-05-12 19:43:19 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-12 19:43:19 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_19-42-47.json
+2026-05-12 19:43:19 - bailing.robot - INFO - 对话数据保存完成
+2026-05-12 19:43:19 - bailing.memory - INFO - 没有未处理的对话文件，无需更新记忆
+2026-05-12 19:43:19 - bailing.robot - INFO - 记忆更新完成
+2026-05-12 19:43:19 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-12 19:43:22 - bailing.robot - INFO - 程序退出
+2026-05-12 19:45:58 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-12 19:45:59 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.40s
+2026-05-12 19:45:59 - root - INFO - download models from model hub: hf
+2026-05-12 19:45:59 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-12 19:45:59 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-12 19:46:00 - root - INFO - scope_map: ['module.', 'None']
+2026-05-12 19:46:00 - root - INFO - excludes: None
+2026-05-12 19:46:00 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-12 19:46:00 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.04s
+2026-05-12 19:46:00 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.02s
+2026-05-12 19:46:00 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-12 19:46:00 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-12 19:46:00 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-12 19:46:00 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-12 19:46:00 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:46:00 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:46:00 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-12 19:46:00 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-12 19:46:01 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-12 19:46:01 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-12 19:46:02 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-12 19:46:02 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.65s
+2026-05-12 19:46:02 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.04s
+2026-05-12 19:46:03 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.40s
+2026-05-12 19:46:03 - bailing.memory - INFO - 检查最新对话文件: tmp\dialogue-2026-05-12_19-42-47.json
+2026-05-12 19:46:03 - bailing.memory - INFO - tmp\dialogue-2026-05-12_19-42-47.json 对话历史已形成记忆
+2026-05-12 19:46:03 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-12 19:46:03 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.57s
+2026-05-12 19:46:03 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-12 19:46:03 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-12 19:46:03 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-12 19:46:03 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-12 19:46:03 - bailing.robot - INFO - Started recording.
+2026-05-12 19:46:03 - bailing.player - INFO - 正在播放启动音效...
+2026-05-12 19:46:03 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-12 19:46:47 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-12 19:46:47 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.31s
+2026-05-12 19:46:47 - root - INFO - download models from model hub: hf
+2026-05-12 19:46:48 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-12 19:46:48 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-12 19:46:48 - root - INFO - scope_map: ['module.', 'None']
+2026-05-12 19:46:48 - root - INFO - excludes: None
+2026-05-12 19:46:48 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-12 19:46:48 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.02s
+2026-05-12 19:46:48 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.02s
+2026-05-12 19:46:49 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-12 19:46:49 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-12 19:46:49 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-12 19:46:49 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-12 19:46:49 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:46:49 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:46:49 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-12 19:46:49 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-12 19:46:50 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-12 19:46:50 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-12 19:46:51 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-12 19:46:51 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.37s
+2026-05-12 19:46:51 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.04s
+2026-05-12 19:46:51 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.38s
+2026-05-12 19:46:51 - bailing.memory - INFO - 检查最新对话文件: tmp\dialogue-2026-05-12_19-42-47.json
+2026-05-12 19:46:51 - bailing.memory - INFO - tmp\dialogue-2026-05-12_19-42-47.json 对话历史已形成记忆
+2026-05-12 19:46:51 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-12 19:46:51 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.15s
+2026-05-12 19:46:51 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-12 19:46:51 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-12 19:46:51 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-12 19:46:51 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-12 19:46:51 - bailing.robot - INFO - Started recording.
+2026-05-12 19:46:51 - bailing.player - INFO - 正在播放启动音效...
+2026-05-12 19:46:51 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-12 19:47:14 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@647de81facf544a089378ab37b40d980.wav
+2026-05-12 19:47:15 - bailing.asr - INFO - 识别文本: 程序。
+2026-05-12 19:47:17 - bailing.robot - INFO - [LLM原始回答] 你好呀！我是塔菲，一个活泼开朗的小助手，很高兴认识你~
+2026-05-12 19:47:17 - bailing.robot - INFO - [LLM回答] 你好呀！我是塔菲，一个活泼开朗的小助手，很高兴认识你~。
+2026-05-12 19:47:17 - bailing.robot - INFO - LLM回答生成完成，总长度28字，已加入TTS任务队列
+2026-05-12 19:47:17 - bailing.robot - INFO - 回答完成，总长度: 28 字
+2026-05-12 19:47:17 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_19-46-51.json
+2026-05-12 19:47:17 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:47:35 - bailing.tts - INFO - [Qwen3TTS] 语音合成完成，耗时: 17.54秒，文本长度: 28字，输出文件: tmp/tts-2026-05-12@0c43358c49e148dd999735508028cbe9.wav
+2026-05-12 19:47:35 - bailing.player - INFO - play file tmp/tts-2026-05-12@0c43358c49e148dd999735508028cbe9.wav
+2026-05-12 19:47:47 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@0a233f31d6ac4d8a9c1090213e3aab59.wav
+2026-05-12 19:47:47 - bailing.asr - INFO - 识别文本: 关闭程序。
+2026-05-12 19:47:48 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，那下次见啦，拜拜~
+2026-05-12 19:47:48 - bailing.robot - INFO - [LLM回答] 好的，那下次见啦，拜拜~。
+2026-05-12 19:47:49 - bailing.robot - INFO - LLM回答生成完成，总长度13字，已加入TTS任务队列
+2026-05-12 19:47:49 - bailing.robot - INFO - 回答完成，总长度: 13 字
+2026-05-12 19:47:49 - bailing.robot - INFO - 检测到用户退出意图，程序即将关闭...
+2026-05-12 19:47:49 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 19:47:49 - bailing.robot - INFO - 告别语音播放完成
+2026-05-12 19:47:49 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-12 19:47:49 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_19-46-51.json
+2026-05-12 19:47:49 - bailing.robot - INFO - 对话数据保存完成
+2026-05-12 19:47:49 - bailing.memory - INFO - 发现1个未处理的对话文件，正在重新生成记忆...
+2026-05-12 19:47:57 - bailing.memory - INFO - 记忆更新完成！已处理1个会话，新记忆长度：809字
+2026-05-12 19:47:57 - bailing.robot - INFO - 记忆更新完成
+2026-05-12 19:47:57 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-12 19:47:57 - bailing.robot - ERROR - TTS 任务出错: 
+2026-05-12 19:47:57 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 19:47:57 - bailing.robot - INFO - 告别语音播放完成
+2026-05-12 19:47:57 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-12 19:47:57 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_19-46-51.json
+2026-05-12 19:47:57 - bailing.robot - INFO - 对话数据保存完成
+2026-05-12 19:47:57 - bailing.memory - INFO - 没有未处理的对话文件，无需更新记忆
+2026-05-12 19:47:57 - bailing.robot - INFO - 记忆更新完成
+2026-05-12 19:47:57 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-12 19:48:00 - bailing.robot - INFO - 程序退出
+2026-05-12 19:52:21 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-12 19:52:22 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.34s
+2026-05-12 19:52:22 - root - INFO - download models from model hub: hf
+2026-05-12 19:52:22 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-12 19:52:22 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-12 19:52:23 - root - INFO - scope_map: ['module.', 'None']
+2026-05-12 19:52:23 - root - INFO - excludes: None
+2026-05-12 19:52:23 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-12 19:52:23 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.02s
+2026-05-12 19:52:23 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.02s
+2026-05-12 19:52:23 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-12 19:52:23 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-12 19:52:23 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-12 19:52:23 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-12 19:52:23 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:52:23 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:52:23 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-12 19:52:23 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-12 19:52:24 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-12 19:52:24 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-12 19:52:25 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-12 19:52:25 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.39s
+2026-05-12 19:52:25 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.05s
+2026-05-12 19:52:25 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.38s
+2026-05-12 19:52:25 - bailing.memory - INFO - 检查最新对话文件: tmp\dialogue-2026-05-12_19-46-51.json
+2026-05-12 19:52:25 - bailing.memory - INFO - tmp\dialogue-2026-05-12_19-46-51.json 对话历史已形成记忆
+2026-05-12 19:52:25 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-12 19:52:25 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.21s
+2026-05-12 19:52:25 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-12 19:52:25 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-12 19:52:25 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-12 19:52:25 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-12 19:52:25 - bailing.robot - INFO - Started recording.
+2026-05-12 19:52:25 - bailing.player - INFO - 正在播放启动音效...
+2026-05-12 19:52:25 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-12 19:52:35 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@34755e3be11240769f56d9ca790556ba.wav
+2026-05-12 19:52:35 - bailing.asr - INFO - 识别文本: 关闭程序。
+2026-05-12 19:52:38 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，已经记录。再见哦！
+2026-05-12 19:52:38 - bailing.robot - INFO - [LLM回答] 好的，已经记录。再见哦！
+2026-05-12 19:52:39 - bailing.robot - INFO - LLM回答生成完成，总长度12字，已加入TTS任务队列
+2026-05-12 19:52:39 - bailing.robot - INFO - 回答完成，总长度: 12 字
+2026-05-12 19:52:39 - bailing.robot - INFO - 检测到用户退出意图，程序即将关闭...
+2026-05-12 19:52:39 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 19:54:10 - bailing.robot - INFO - Received KeyboardInterrupt. Exiting...
+2026-05-12 19:54:10 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 19:58:29 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-12 19:58:29 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.37s
+2026-05-12 19:58:29 - root - INFO - download models from model hub: hf
+2026-05-12 19:58:30 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-12 19:58:30 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-12 19:58:30 - root - INFO - scope_map: ['module.', 'None']
+2026-05-12 19:58:30 - root - INFO - excludes: None
+2026-05-12 19:58:30 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-12 19:58:30 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.02s
+2026-05-12 19:58:30 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.02s
+2026-05-12 19:58:30 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-12 19:58:31 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-12 19:58:31 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-12 19:58:31 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-12 19:58:31 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:58:31 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 19:58:31 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-12 19:58:31 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-12 19:58:32 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-12 19:58:32 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-12 19:58:33 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-12 19:58:33 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.46s
+2026-05-12 19:58:33 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.04s
+2026-05-12 19:58:33 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.32s
+2026-05-12 19:58:33 - bailing.memory - INFO - 检查最新对话文件: tmp\dialogue-2026-05-12_19-46-51.json
+2026-05-12 19:58:33 - bailing.memory - INFO - tmp\dialogue-2026-05-12_19-46-51.json 对话历史已形成记忆
+2026-05-12 19:58:33 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-12 19:58:33 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.25s
+2026-05-12 19:58:33 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-12 19:58:33 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-12 19:58:33 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-12 19:58:33 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-12 19:58:33 - bailing.robot - INFO - Started recording.
+2026-05-12 19:58:33 - bailing.player - INFO - 正在播放启动音效...
+2026-05-12 19:58:33 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-12 19:58:47 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@e7df51bde5bd4a1491d5873008d764e0.wav
+2026-05-12 19:58:47 - bailing.asr - INFO - 识别文本: 关闭程序。
+2026-05-12 19:58:50 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，塔菲这就退下啦，下次需要再叫我哦！
+2026-05-12 19:58:50 - bailing.robot - INFO - [LLM回答] 好的，塔菲这就退下啦，下次需要再叫我哦！
+2026-05-12 19:58:51 - bailing.robot - INFO - LLM回答生成完成，总长度20字，已加入TTS任务队列
+2026-05-12 19:58:51 - bailing.robot - INFO - 回答完成，总长度: 20 字
+2026-05-12 19:58:51 - bailing.robot - INFO - 检测到用户退出意图，程序即将关闭...
+2026-05-12 19:58:51 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 20:01:12 - bailing.robot - INFO - Received KeyboardInterrupt. Exiting...
+2026-05-12 20:01:12 - bailing.robot - INFO - 等待告别语音生成+播放完成...
+2026-05-12 20:02:13 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-12 20:02:13 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.39s
+2026-05-12 20:02:13 - root - INFO - download models from model hub: hf
+2026-05-12 20:02:14 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-12 20:02:14 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-12 20:02:14 - root - INFO - scope_map: ['module.', 'None']
+2026-05-12 20:02:14 - root - INFO - excludes: None
+2026-05-12 20:02:14 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-12 20:02:14 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.02s
+2026-05-12 20:02:14 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.02s
+2026-05-12 20:02:14 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-12 20:02:15 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-12 20:02:15 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-12 20:02:15 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-12 20:02:15 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 20:02:15 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 20:02:15 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-12 20:02:15 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-12 20:02:15 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-12 20:02:15 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-12 20:02:17 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-12 20:02:17 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.42s
+2026-05-12 20:02:17 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.04s
+2026-05-12 20:02:17 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.38s
+2026-05-12 20:02:17 - bailing.memory - INFO - 检查最新对话文件: tmp\dialogue-2026-05-12_19-46-51.json
+2026-05-12 20:02:17 - bailing.memory - INFO - tmp\dialogue-2026-05-12_19-46-51.json 对话历史已形成记忆
+2026-05-12 20:02:17 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-12 20:02:17 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.29s
+2026-05-12 20:02:17 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-12 20:02:17 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-12 20:02:17 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-12 20:02:17 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-12 20:02:17 - bailing.robot - INFO - Started recording.
+2026-05-12 20:02:17 - bailing.player - INFO - 正在播放启动音效...
+2026-05-12 20:02:17 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-12 20:02:25 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@ced429b0caba4071b41efbc1fd00d55e.wav
+2026-05-12 20:02:25 - bailing.asr - INFO - 识别文本: 请问1989年6月1。
+2026-05-12 20:02:29 - bailing.robot - INFO - [LLM原始回答] 1989年6月1日是星期四。有什么需要帮忙的吗？
+2026-05-12 20:02:29 - bailing.robot - INFO - [LLM回答] 1989年6月1日是星期四。有什么需要帮忙的吗？
+2026-05-12 20:02:31 - bailing.robot - INFO - LLM回答生成完成，总长度24字，已加入TTS任务队列
+2026-05-12 20:02:31 - bailing.robot - INFO - 回答完成，总长度: 24 字
+2026-05-12 20:02:31 - bailing.player - INFO - play file d:\bailing-main\voice_cache\voice2.wav
+2026-05-12 20:02:33 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_20-02-17.json
+2026-05-12 20:02:33 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-12 20:02:47 - bailing.tts - INFO - [Qwen3TTS] 语音合成完成，耗时: 14.24秒，文本长度: 24字，输出文件: tmp/tts-2026-05-12@ac7305b27fc648e9b9fb139ff671c4d0.wav
+2026-05-12 20:02:47 - bailing.player - INFO - play file tmp/tts-2026-05-12@ac7305b27fc648e9b9fb139ff671c4d0.wav
+2026-05-12 20:03:00 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-12@565a17fc90c4484c907baa391b5bc446.wav
+2026-05-12 20:03:00 - bailing.asr - INFO - 识别文本: 没有了，关闭程序。
+2026-05-12 20:03:02 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，拜拜啦！下次有需要再找我~
+2026-05-12 20:03:02 - bailing.robot - INFO - [LLM回答] 好的，拜拜啦！下次有需要再找我~。
+2026-05-12 20:03:04 - bailing.robot - INFO - LLM回答生成完成，总长度17字，已加入TTS任务队列
+2026-05-12 20:03:04 - bailing.robot - INFO - 检测到用户退出意图，等播放完后程序关闭...
+2026-05-12 20:05:25 - bailing.robot - INFO - Received KeyboardInterrupt. Exiting...
+2026-05-12 20:05:25 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-12 20:05:25 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_20-02-17.json
+2026-05-12 20:05:25 - bailing.robot - INFO - 对话数据保存完成
+2026-05-12 20:05:25 - bailing.memory - INFO - 发现1个未处理的对话文件，正在重新生成记忆...
+2026-05-12 20:05:40 - bailing.memory - INFO - 记忆更新完成！已处理1个会话，新记忆长度：989字
+2026-05-12 20:05:40 - bailing.robot - INFO - 记忆更新完成
+2026-05-12 20:05:40 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-12 20:05:40 - bailing.robot - INFO - 回答完成，总长度: 17 字
+2026-05-12 20:05:40 - bailing.robot - ERROR - TTS 任务出错: 
+2026-05-12 20:05:40 - bailing.robot - INFO - 告别语音播放完成，程序即将关闭...
+2026-05-12 20:05:40 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-12 20:05:40 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-12_20-02-17.json
+2026-05-12 20:05:40 - bailing.robot - INFO - 对话数据保存完成
+2026-05-12 20:05:40 - bailing.memory - INFO - 没有未处理的对话文件，无需更新记忆
+2026-05-12 20:05:40 - bailing.robot - INFO - 记忆更新完成
+2026-05-12 20:05:40 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-12 20:05:43 - bailing.robot - INFO - 程序退出
+2026-05-13 09:58:52 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-13 09:58:53 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.39s
+2026-05-13 09:58:53 - root - INFO - download models from model hub: hf
+2026-05-13 09:58:53 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-13 09:58:53 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-13 09:58:54 - root - INFO - scope_map: ['module.', 'None']
+2026-05-13 09:58:54 - root - INFO - excludes: None
+2026-05-13 09:58:54 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-13 09:58:54 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.29s
+2026-05-13 09:58:54 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.08s
+2026-05-13 09:58:56 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-13 09:58:56 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-13 09:58:56 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-13 09:58:56 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-13 09:58:56 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-13 09:58:56 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-13 09:58:56 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-13 09:58:56 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-13 09:58:58 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-13 09:58:58 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-13 09:59:00 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-13 09:59:00 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 5.70s
+2026-05-13 09:59:00 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.08s
+2026-05-13 09:59:00 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.40s
+2026-05-13 09:59:00 - bailing.memory - INFO - 检查最新对话文件: tmp\dialogue-2026-05-12_20-02-17.json
+2026-05-13 09:59:00 - bailing.memory - INFO - tmp\dialogue-2026-05-12_20-02-17.json 对话历史已形成记忆
+2026-05-13 09:59:00 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-13 09:59:00 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 7.95s
+2026-05-13 09:59:00 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-13 09:59:00 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-13 09:59:00 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-13 09:59:00 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-13 09:59:00 - bailing.robot - INFO - Started recording.
+2026-05-13 09:59:00 - bailing.player - INFO - 正在播放启动音效...
+2026-05-13 09:59:00 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-13 09:59:14 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-13@3ac79b45328346a3a9f6ef016092ac5e.wav
+2026-05-13 09:59:14 - bailing.asr - INFO - 识别文本: 关闭程序。
+2026-05-13 09:59:16 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，程序这就关闭啦，下次想聊天随时找我哟！
+2026-05-13 09:59:16 - bailing.robot - INFO - [LLM回答] 好的，程序这就关闭啦，下次想聊天随时找我哟！
+2026-05-13 09:59:18 - bailing.robot - INFO - LLM回答生成完成，总长度22字，已加入TTS任务队列
+2026-05-13 09:59:18 - bailing.robot - INFO - 检测到用户退出意图，等TTS播完后自动关闭...
+2026-05-13 09:59:18 - bailing.robot - INFO - 回答完成，总长度: 22 字
+2026-05-13 09:59:18 - bailing.player - INFO - play file d:\bailing-main\voice_cache\voice2.wav
+2026-05-13 09:59:20 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-13_09-59-00.json
+2026-05-13 09:59:20 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-13 09:59:35 - bailing.tts - INFO - [Qwen3TTS] 语音合成完成，耗时: 15.23秒，文本长度: 22字，输出文件: tmp/tts-2026-05-13@cd18e5411ab64e2385b57a8443360af4.wav
+2026-05-13 09:59:35 - bailing.player - INFO - play file tmp/tts-2026-05-13@cd18e5411ab64e2385b57a8443360af4.wav
+2026-05-13 10:00:52 - bailing.robot - INFO - Received KeyboardInterrupt. Exiting...
+2026-05-13 10:00:52 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-13 10:00:52 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-13_09-59-00.json
+2026-05-13 10:00:52 - bailing.robot - INFO - 对话数据保存完成
+2026-05-13 10:00:52 - bailing.memory - INFO - 发现1个未处理的对话文件，正在重新生成记忆...
+2026-05-13 10:01:01 - bailing.memory - INFO - 记忆更新完成！已处理1个会话，新记忆长度：808字
+2026-05-13 10:01:01 - bailing.robot - INFO - 记忆更新完成
+2026-05-13 10:01:01 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-13 10:01:04 - bailing.robot - INFO - 程序退出
+2026-05-13 10:16:23 - __main__ - INFO - 百聆智能语音助手启动中...
+2026-05-13 10:16:23 - bailing.robot - INFO - [启动] 录音模块加载完成，耗时: 0.34s
+2026-05-13 10:16:23 - root - INFO - download models from model hub: hf
+2026-05-13 10:16:24 - root - INFO - Loading pretrained params from models/SenseVoiceSmall\model.pt
+2026-05-13 10:16:24 - root - INFO - ckpt: models/SenseVoiceSmall\model.pt
+2026-05-13 10:16:24 - root - INFO - scope_map: ['module.', 'None']
+2026-05-13 10:16:24 - root - INFO - excludes: None
+2026-05-13 10:16:24 - root - INFO - Loading ckpt: models/SenseVoiceSmall\model.pt, status: <All keys matched successfully>
+2026-05-13 10:16:24 - bailing.robot - INFO - [启动] ASR语音识别模块加载完成，耗时: 1.13s
+2026-05-13 10:16:24 - bailing.robot - INFO - [启动] LLM大模型模块加载完成，耗时: 0.04s
+2026-05-13 10:16:25 - sox - WARNING - SoX could not be found!
+
+    If you do not have SoX, proceed here:
+     - - - http://sox.sourceforge.net/ - - -
+
+    If you do (or think that you should) have SoX, double-check your
+    path variables.
+    
+2026-05-13 10:16:25 - bailing.tts - INFO - [Qwen3TTS] 正在加载模型: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
+2026-05-13 10:16:25 - qwen_tts.core.models.configuration_qwen3_tts - INFO - talker_config is None. Initializing talker model with default values
+2026-05-13 10:16:25 - qwen_tts.core.models.configuration_qwen3_tts - INFO - speaker_encoder_config is None. Initializing talker model with default values
+2026-05-13 10:16:25 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-13 10:16:25 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-13 10:16:25 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - encoder_config is None. Initializing encoder with default values
+2026-05-13 10:16:25 - qwen_tts.core.tokenizer_12hz.configuration_qwen3_tts_tokenizer_v2 - INFO - decoder_config is None. Initializing decoder with default values
+2026-05-13 10:16:26 - bailing.tts - INFO - [Qwen3TTS] 模型加载完成
+2026-05-13 10:16:26 - bailing.tts - INFO - [Qwen3TTS] 正在创建音色克隆，参考音频: D:\bailing-main\voice_design_reference.wav
+2026-05-13 10:16:27 - bailing.tts - INFO - [Qwen3TTS] 音色克隆提示创建成功
+2026-05-13 10:16:27 - bailing.robot - INFO - [启动] TTS语音合成模块加载完成，耗时: 2.79s
+2026-05-13 10:16:27 - bailing.robot - INFO - [启动] VAD语音端点检测模块加载完成，耗时: 0.04s
+2026-05-13 10:16:28 - bailing.robot - INFO - [启动] 播放器模块加载完成，耗时: 0.32s
+2026-05-13 10:16:28 - bailing.robot - INFO - [启动] 记忆模块加载完成，耗时: 0.01s
+2026-05-13 10:16:28 - bailing.robot - INFO - [启动] 所有模块加载完成，总耗时: 4.68s
+2026-05-13 10:16:28 - bailing.robot - INFO - 工具调用功能状态：关闭
+2026-05-13 10:16:28 - bailing.robot - INFO - 已跳过工具模块加载，启动速度优化
+2026-05-13 10:16:28 - bailing.robot - INFO - 已启用非流式TTS模式，当前模型：Qwen3TTS
+2026-05-13 10:16:28 - __main__ - INFO - 初始化完成，等待用户语音指令...
+2026-05-13 10:16:28 - bailing.robot - INFO - Started recording.
+2026-05-13 10:16:28 - bailing.player - INFO - 正在播放启动音效...
+2026-05-13 10:16:28 - bailing.player - INFO - play file d:\bailing-main\voice_cache\prologue.wav
+2026-05-13 10:16:36 - bailing.asr - INFO - ASR识别文件录音保存到：tmp/asr-2026-05-13@fb95340ce946485482ff28df60b73c0f.wav
+2026-05-13 10:16:37 - bailing.asr - INFO - 识别文本: 关闭程序。
+2026-05-13 10:16:39 - bailing.robot - INFO - [LLM原始回答] <|EXIT_PROGRAM|>好的，那我们就下次再聊啦，拜拜~
+2026-05-13 10:16:39 - bailing.robot - INFO - [LLM回答] 好的，那我们就下次再聊啦，拜拜~。
+2026-05-13 10:16:40 - bailing.robot - INFO - LLM回答生成完成，总长度17字，已加入TTS任务队列
+2026-05-13 10:16:40 - bailing.robot - INFO - 检测到用户退出意图，等TTS播完后自动关闭...
+2026-05-13 10:16:40 - bailing.robot - INFO - 回答完成，总长度: 17 字
+2026-05-13 10:16:40 - bailing.player - INFO - play file d:\bailing-main\voice_cache\voice2.wav
+2026-05-13 10:16:42 - bailing.robot - INFO - 告别语音播放完成，程序即将关闭...
+2026-05-13 10:16:42 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-13 10:16:42 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-13_10-16-28.json
+2026-05-13 10:16:42 - bailing.robot - INFO - 对话数据保存完成
+2026-05-13 10:16:42 - bailing.memory - INFO - 发现1个未处理的对话文件，正在重新生成记忆...
+2026-05-13 10:16:42 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-13_10-16-28.json
+2026-05-13 10:16:42 - qwen_tts.core.models.configuration_qwen3_tts - INFO - code_predictor_config is None. Initializing code_predictor model with default values
+2026-05-13 10:16:49 - bailing.memory - INFO - 记忆更新完成！已处理1个会话，新记忆长度：617字
+2026-05-13 10:16:49 - bailing.robot - INFO - 记忆更新完成
+2026-05-13 10:16:49 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-13 10:16:49 - bailing.robot - INFO - 正在关闭系统，优先保存数据...
+2026-05-13 10:16:49 - bailing.dialogue - INFO - 本次会话对话已保存: tmp/dialogue-2026-05-13_10-16-28.json
+2026-05-13 10:16:49 - bailing.robot - INFO - 对话数据保存完成
+2026-05-13 10:16:49 - bailing.memory - INFO - 没有未处理的对话文件，无需更新记忆
+2026-05-13 10:16:49 - bailing.robot - INFO - 记忆更新完成
+2026-05-13 10:16:49 - bailing.robot - INFO - 开始关闭其他模块...
+2026-05-13 10:16:52 - bailing.tts - INFO - [Qwen3TTS] 语音合成完成，耗时: 9.51秒，文本长度: 17字，输出文件: tmp/tts-2026-05-13@b139181efa934aaab368c04badfba388.wav
+2026-05-13 10:16:52 - bailing.robot - INFO - 程序退出
