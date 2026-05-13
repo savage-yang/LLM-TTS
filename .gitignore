@@ -2,13 +2,10 @@
 __pycache__/
 *.egg-info/
 .DS_Store
-tmp/
-voice_cache/
+
 models/*
 Qwen3-TTS-12Hz-0.6B-Base/
-*.wav
-*.log
-config/config.yaml
+
 .env
 *.bak
 *.swp
