@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor
 import argparse
 import time
 from typing import Dict, Any, Optional, List
-
 import numpy as np
 
 from bailing.recorder import create_instance as create_recorder
@@ -328,9 +327,6 @@ class Robot(ABC):
         if vad_status is not None:
             self.last_voice_time = current_time
 
-        if vad_status is None:
-            return
-
         if self.vad_start:
             if current_time - self.last_voice_time > self.max_silence_before_speech:
                 logger.debug(f"静默超过{self.max_silence_before_speech}ms，自动结束本次录音")
@@ -344,6 +340,9 @@ class Robot(ABC):
                 and not self.player.get_playing_status() and not self.chat_lock:
             result = self.task_queue.get()
             self._submit_task_tts(result.response)
+
+        if vad_status is None:
+            return
 
         if "start" in vad_status:
             self.last_voice_time = current_time
