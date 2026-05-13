@@ -7,10 +7,13 @@ import threading
 import uuid
 from abc import ABC, abstractmethod
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 import argparse
 import time
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
+
+import numpy as np
+
 from bailing.recorder import create_instance as create_recorder
 from bailing.player import create_instance as create_player, PygameStreamPlayer
 from bailing.asr import create_instance as create_asr
@@ -26,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 class Robot(ABC):
+    EXIT_TOKEN = "<|EXIT_PROGRAM|>"
+
     def __init__(self, config_file: str, websocket: Optional[Any] = None, loop: Optional[Any] = None):
         config = read_config(config_file)
         self.audio_queue = queue.Queue()
@@ -202,7 +207,6 @@ class Robot(ABC):
         consumer_audio.start()
 
     def _check_audio_energy(self, voice_data_list):
-        import numpy as np
 
         if not voice_data_list:
             return 0.0
@@ -285,7 +289,38 @@ class Robot(ABC):
         self.last_asr_text = ""
         self.last_asr_time = 0.0
 
-    def _duplex(self) -> bool:
+    def _process_asr_result(self, voice_data_list):
+        """统一的 ASR 识别+过滤流程"""
+        self.vad_start = False
+        voice_data = [d["voice"] for d in voice_data_list]
+
+        if self._check_audio_energy(voice_data) < self.min_audio_energy:
+            logger.debug("音频能量过低，过滤纯杂音")
+            return
+
+        try:
+            text, tmpfile = self.asr.recognizer(voice_data)
+        except Exception as e:
+            logger.error(f"ASR识别出错: {e}")
+            return
+
+        if not text.strip():
+            logger.debug("识别结果为空，跳过处理。")
+            return
+
+        now = time.time()
+        if text.strip() == self.last_asr_text and now - self.last_asr_time < 1.0:
+            logger.debug(f"重复识别结果已过滤：{text}")
+            return
+        self.last_asr_text = text.strip()
+        self.last_asr_time = now
+
+        logger.debug(f"ASR识别结果: {text}")
+        if self.callback:
+            self.callback({"role": "user", "content": str(text)})
+        self._submit_chat(text)
+
+    def _duplex(self) -> None:
         data = self.vad_queue.get()
         vad_status = data.get("vad_statue")
         current_time = time.time() * 1000
@@ -293,53 +328,26 @@ class Robot(ABC):
         if vad_status is not None:
             self.last_voice_time = current_time
 
+        if vad_status is None:
+            return
+
         if self.vad_start:
             if current_time - self.last_voice_time > self.max_silence_before_speech:
                 logger.debug(f"静默超过{self.max_silence_before_speech}ms，自动结束本次录音")
-                try:
-                    self.vad_start = False
-                    voice_data = [d["voice"] for d in self.speech]
-
-                    if self._check_audio_energy(voice_data) < self.min_audio_energy:
-                        logger.debug("音频能量过低，过滤纯杂音")
-                        self.speech = []
-                        return True
-
-                    text, tmpfile = self.asr.recognizer(voice_data)
-                    self.speech = []
-                except Exception as e:
-                    self.vad_start = False
-                    self.speech = []
-                    logger.error(f"ASR识别出错: {e}")
-                    return True
-                if not text.strip():
-                    logger.debug("识别结果为空，跳过处理。")
-                    return True
-
-                current_time_sec = time.time()
-                if text.strip() == self.last_asr_text and current_time_sec - self.last_asr_time < 1.0:
-                    logger.debug(f"重复识别结果已过滤：{text}")
-                    return True
-                self.last_asr_text = text.strip()
-                self.last_asr_time = current_time_sec
-
-                logger.debug(f"ASR识别结果: {text}")
-                if self.callback:
-                    self.callback({"role": "user", "content": str(text)})
-                self._submit_chat(text)
-                return True
+                speech = self.speech
+                self.speech = []
+                self._process_asr_result(speech)
+                return
             self.speech.append(data)
 
-        if self.task_queue is not None and not self.task_queue.empty() and not self.vad_start and vad_status is None \
-                and not self.player.get_playing_status() and self.chat_lock is False:
+        if self.task_queue is not None and not self.task_queue.empty() and not self.vad_start \
+                and not self.player.get_playing_status() and not self.chat_lock:
             result = self.task_queue.get()
             self._submit_task_tts(result.response)
 
-        if vad_status is None:
-            return True
         if "start" in vad_status:
             self.last_voice_time = current_time
-            if self.player.get_playing_status() or self.chat_lock is True:
+            if self.player.get_playing_status() or self.chat_lock:
                 if self.INTERRUPT:
                     self.chat_lock = False
                     self.interrupt_playback()
@@ -347,45 +355,16 @@ class Robot(ABC):
                     self.speech = []
                     self.speech.append(data)
                 else:
-                    return True
+                    return
             else:
                 self.vad_start = True
                 self.speech = []
                 self.speech.append(data)
         elif "end" in vad_status and len(self.speech) > 0:
-            try:
-                logger.debug(f"语音包的长度：{len(self.speech)}")
-                self.vad_start = False
-                voice_data = [d["voice"] for d in self.speech]
-
-                if self._check_audio_energy(voice_data) < self.min_audio_energy:
-                    logger.debug("音频能量过低，过滤纯杂音")
-                    self.speech = []
-                    return True
-
-                text, tmpfile = self.asr.recognizer(voice_data)
-                self.speech = []
-            except Exception as e:
-                self.vad_start = False
-                self.speech = []
-                logger.error(f"ASR识别出错: {e}")
-                return True
-            if not text.strip():
-                logger.debug("识别结果为空，跳过处理。")
-                return True
-
-            current_time = time.time()
-            if text.strip() == self.last_asr_text and current_time - self.last_asr_time < 1.0:
-                logger.debug(f"重复识别结果已过滤：{text}")
-                return True
-            self.last_asr_text = text.strip()
-            self.last_asr_time = current_time
-
-            logger.debug(f"ASR识别结果: {text}")
-            if self.callback:
-                self.callback({"role": "user", "content": str(text)})
-            self._submit_chat(text)
-        return True
+            logger.debug(f"语音包的长度：{len(self.speech)}")
+            speech = self.speech
+            self.speech = []
+            self._process_asr_result(speech)
 
     @abstractmethod
     def _submit_chat(self, text: str) -> None:
@@ -425,7 +404,6 @@ class Robot(ABC):
             logger.info(f"无需tts转换，query为空，{text}")
             return None
 
-        import re
         text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
         text = text.replace('"', '').replace("'", "")
 
@@ -521,7 +499,6 @@ class Robot(ABC):
 
     def chat(self, query: str) -> Optional[bool]:
         self.dialogue.put(Message(role="user", content=query))
-        response_message = []
         self.chat_lock = True
 
         buffer_finish_event, buffer_played = threading.Event(), False
@@ -541,7 +518,6 @@ class Robot(ABC):
 
         response_message = []
         need_exit = False
-        EXIT_TOKEN = "<|EXIT_PROGRAM|>"
 
         if self.start_task_mode:
             response_message = self.chat_tool(query)
@@ -557,11 +533,10 @@ class Robot(ABC):
             for content in llm_responses:
                 if content is None or len(content) == 0:
                     continue
-                if not self.start_task_mode:
-                    content = re.sub(r'```json.*?```', '', content, flags=re.DOTALL)
-                    content = re.sub(r'\{\"function_name\".*?\}', '', content, flags=re.DOTALL)
-                    if not content.strip():
-                        continue
+                content = re.sub(r'```json.*?```', '', content, flags=re.DOTALL)
+                content = re.sub(r'\{\"function_name\".*?\}', '', content, flags=re.DOTALL)
+                if not content.strip():
+                    continue
                 response_message.append(content)
                 logger.debug(f"收到LLM token: {content}")
                 self._chat_handle_token(content)
@@ -570,8 +545,8 @@ class Robot(ABC):
 
         raw_full_response = "".join(response_message).strip()
         logger.info(f"[LLM原始回答] {raw_full_response}")
-        full_response = raw_full_response.replace(EXIT_TOKEN, "").strip()
-        if EXIT_TOKEN in raw_full_response:
+        full_response = raw_full_response.replace(self.EXIT_TOKEN, "").strip()
+        if self.EXIT_TOKEN in raw_full_response:
             need_exit = True
             logger.debug(f"检测到退出标记，已过滤，need_exit设为True")
 
@@ -693,11 +668,9 @@ class StreamRobot(Robot):
     def interrupt_playback(self) -> None:
         logger.info("Interrupting current playback and TTS generation.")
         self.pending_shutdown = False
-        if self.stream_player is not None and self.current_tts_stream:
+        if self.current_tts_stream:
             self.current_tts_stream.reset()
-            self.stream_player.clear_buffer()
-        if self.stream_player is not None:
-            self.stream_player.clear_buffer()
+        self.stream_player.clear_buffer()
         self.player.stop()
 
     def _chat_reset_tts(self) -> None:
@@ -708,8 +681,6 @@ class StreamRobot(Robot):
         self._tts_initialized = False
 
     def _chat_handle_token(self, content: str) -> None:
-        EXIT_TOKEN = "<|EXIT_PROGRAM|>"
-
         if not self._tts_initialized and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY and content.strip():
             self._init_stream_connection()
             self._tts_initialized = True
@@ -721,7 +692,7 @@ class StreamRobot(Robot):
             current_time = time.time()
 
             if current_time - self.last_stream_flush_time >= self.stream_buffer_duration:
-                filtered_content = self.stream_buffer.replace(EXIT_TOKEN, "")
+                filtered_content = self.stream_buffer.replace(self.EXIT_TOKEN, "")
                 if not self.start_task_mode:
                     filtered_content = re.sub(r'```json.*?```', '', filtered_content, flags=re.DOTALL)
                     filtered_content = re.sub(r'\{\"function_name\".*?\}', '', filtered_content, flags=re.DOTALL)
@@ -779,8 +750,7 @@ class StreamRobot(Robot):
     def _chat_flush_tts(self) -> None:
         if self.current_tts_stream is not None and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
             if self.stream_buffer.strip():
-                EXIT_TOKEN = "<|EXIT_PROGRAM|>"
-                filtered_content = self.stream_buffer.replace(EXIT_TOKEN, "")
+                filtered_content = self.stream_buffer.replace(self.EXIT_TOKEN, "")
                 if not self.start_task_mode:
                     filtered_content = re.sub(r'```json.*?```', '', filtered_content, flags=re.DOTALL)
                     filtered_content = re.sub(r'\{\"function_name\".*?\}', '', filtered_content, flags=re.DOTALL)
