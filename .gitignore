@@ -3,10 +3,12 @@ __pycache__/
 *.egg-info/
 .DS_Store
 
-# models/*
-# !models/.gitkeep
-# Qwen3-TTS-12Hz-0.6B-Base/*
-# !Qwen3-TTS-12Hz-0.6B-Base/.gitkeep
+models/*
+!models/.gitkeep
+models/SenseVoiceSmall/*
+!models/SenseVoiceSmall/.gitkeep
+Qwen3-TTS-12Hz-0.6B-Base/*
+!Qwen3-TTS-12Hz-0.6B-Base/.gitkeep
 
 .env
 *.bak
