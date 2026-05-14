@@ -33,7 +33,7 @@ ASR:
 VAD:
   SileroVAD:
     sampling_rate: 16000
-    threshold: 0.80
+    threshold: 0.70
     min_silence_duration_ms: 1500  # 如果说话停顿比较长，可以把这个值设大一些
 
 LLM:

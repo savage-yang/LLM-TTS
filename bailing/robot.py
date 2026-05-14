@@ -295,7 +295,7 @@ class Robot(ABC):
         self.last_asr_time = 0.0
 
     def _process_asr_result(self, voice_data_list):
-        """统一的 ASR 识别+过滤流程"""
+        """统一的 ASR 识别+过滤流程（异步，不阻塞 VAD 主循环）"""
         self.vad_start = False
         voice_data = [d["voice"] for d in voice_data_list]
 
@@ -303,6 +303,10 @@ class Robot(ABC):
             logger.debug("音频能量过低，过滤纯杂音")
             return
 
+        threading.Thread(target=self._async_asr_process, args=(voice_data,), daemon=True).start()
+
+    def _async_asr_process(self, voice_data):
+        """后台线程：ASR 识别 + 文本处理"""
         try:
             text, tmpfile = self.asr.recognizer(voice_data)
         except Exception as e:
@@ -320,12 +324,9 @@ class Robot(ABC):
         self.last_asr_text = text.strip()
         self.last_asr_time = now
 
-        # 计算开始和结束时间
         end_time = time.time()
-        # 假设平均每个语音数据包 0.032 秒（512 点，16kHz）
-        start_time = end_time - len(voice_data_list) * 0.032
+        start_time = end_time - len(voice_data) * 0.032
 
-        # 使用监听模式管理器处理 ASR 结果
         processed_text = self.listening_manager.process_asr_result(text, start_time, end_time)
 
         if processed_text is not None and processed_text.strip():
