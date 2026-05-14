@@ -62,7 +62,7 @@ TTS:
     url: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime" # 国内节点，新加坡节点用wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime
     output_dir: tmp/
     disable_tts_sentence_buffer: true # 禁用服务端标点分句缓冲，强制收到文本就立刻合成，降低首字延迟
-    first_buffer_duration: 2.0 # 首次缓冲时间（秒），用于充分过滤特殊token，之后恢复正常缓冲
+    first_buffer_duration: 1.5 # 首次缓冲时间（秒），用于充分过滤特殊token，之后恢复正常缓冲
 
 Player:
   # 普通文件播放器
@@ -95,7 +95,15 @@ TaskManager:
 # 缓冲音效配置：LLM响应等待时播放
 BufferSound:
   enabled: true # 是否开启缓冲音效
-  threshold_length: 5 # 问题长度超过这个字数就播放缓冲音效（可调整）
-  file_prefix: "voice" # 音效文件名前缀，比如voice1.wav voice2.wav
+  threshold_length: 10 # 问题长度超过这个字数就播放缓冲音效（可调整）
+  file_prefix: "voice3" # 音效文件名前缀，比如voice1.wav voice2.wav
   file_dir: "voice_cache" # 音效存放目录
   pause_after_buffer: 0.5 # 缓冲音效结束后到TTS开始的停顿时间，单位秒（0就是不停顿）
+
+# 监听模式配置
+ListeningMode:
+  enabled: true
+  summary_interval: 100 # 自动总结间隔（秒），默认5分钟
+  summary_word_threshold: 300 # 自动总结字数阈值
+  dialogue_idle_timeout: 120 # 对话模式空闲超时（秒），超时自动切回监听模式
+  summary_save_path: "./tmp/listening_summaries"

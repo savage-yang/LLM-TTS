@@ -23,12 +23,14 @@ from bailing.memory import Memory
 from bailing.dialogue import Message, Dialogue
 from bailing.utils import read_config, extract_json_from_string
 from bailing.prompt import sys_prompt
+from bailing.listening_mode import ListeningModeManager
 
 logger = logging.getLogger(__name__)
 
 
 class Robot(ABC):
     EXIT_TOKEN = "<|EXIT_PROGRAM|>"
+    SWITCH_LISTEN_TOKEN = "<|SWITCH_LISTEN|>"
 
     def __init__(self, config_file: str, websocket: Optional[Any] = None, loop: Optional[Any] = None):
         config = read_config(config_file)
@@ -81,6 +83,10 @@ class Robot(ABC):
         t7 = time.time()
         self.memory = Memory(config.get("Memory"))
         logger.info(f"[启动] 记忆模块加载完成，耗时: {time.time()-t7:.2f}s")
+
+        # 初始化监听模式管理器
+        self.listening_manager = ListeningModeManager(config, self.llm)
+        logger.info(f"[启动] 监听模式管理器加载完成")
 
         logger.info(f"[启动] 所有模块加载完成，总耗时: {time.time()-start_time:.2f}s")
 
@@ -314,10 +320,35 @@ class Robot(ABC):
         self.last_asr_text = text.strip()
         self.last_asr_time = now
 
-        logger.debug(f"ASR识别结果: {text}")
-        if self.callback:
-            self.callback({"role": "user", "content": str(text)})
-        self._submit_chat(text)
+        # 计算开始和结束时间
+        end_time = time.time()
+        # 假设平均每个语音数据包 0.032 秒（512 点，16kHz）
+        start_time = end_time - len(voice_data_list) * 0.032
+
+        # 使用监听模式管理器处理 ASR 结果
+        processed_text = self.listening_manager.process_asr_result(text, start_time, end_time)
+
+        if processed_text is not None and processed_text.strip():
+            logger.debug(f"ASR识别结果(对话模式): {processed_text}")
+            if self.callback:
+                self.callback({"role": "user", "content": str(processed_text)})
+            self._submit_chat(processed_text)
+        elif processed_text is not None:
+            logger.debug(f"ASR识别结果(对话模式，但内容为空，忽略)")
+        elif not self.listening_manager.is_listening_mode():
+            logger.debug(f"检测到唤醒词「百聆」，播放唤醒音效，等待后续对话")
+            self._play_wakeup_sound()
+        else:
+            logger.debug(f"ASR识别结果(监听模式): {text}")
+
+    def _play_wakeup_sound(self) -> None:
+        root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        wakeup_path = os.path.join(root_path, "voice_cache", "wakeup.wav")
+        if os.path.exists(wakeup_path):
+            logger.debug("播放唤醒音效")
+            threading.Thread(target=self.player.play, args=(wakeup_path,), daemon=True).start()
+        else:
+            logger.debug(f"唤醒音效文件不存在：{wakeup_path}")
 
     def _duplex(self) -> None:
         data = self.vad_queue.get()
@@ -326,6 +357,9 @@ class Robot(ABC):
 
         if vad_status is not None:
             self.last_voice_time = current_time
+            # VAD检测到声音，更新最后活动时间
+            if hasattr(self, 'last_activity_time'):
+                self.last_activity_time = time.time()
 
         if self.vad_start:
             if current_time - self.last_voice_time > self.max_silence_before_speech:
@@ -500,6 +534,8 @@ class Robot(ABC):
         self.dialogue.put(Message(role="user", content=query))
         self.chat_lock = True
 
+        self.listening_manager.notify_dialogue_activity()
+
         buffer_finish_event, buffer_played = threading.Event(), False
         buffer_finish_event.set()
         query_length = len(query.strip())
@@ -517,6 +553,7 @@ class Robot(ABC):
 
         response_message = []
         need_exit = False
+        need_switch_listen = False
 
         if self.start_task_mode:
             response_message = self.chat_tool(query)
@@ -548,6 +585,12 @@ class Robot(ABC):
         if self.EXIT_TOKEN in raw_full_response:
             need_exit = True
             logger.debug(f"检测到退出标记，已过滤，need_exit设为True")
+        
+        # 检测切换监听模式标记
+        full_response = full_response.replace(self.SWITCH_LISTEN_TOKEN, "").strip()
+        if self.SWITCH_LISTEN_TOKEN in raw_full_response:
+            need_switch_listen = True
+            logger.debug(f"检测到切换监听标记，已过滤，need_switch_listen设为True")
 
         if full_response and len(full_response) > 2:
             end_char = full_response[-1]
@@ -591,6 +634,11 @@ class Robot(ABC):
             self._chat_flush_tts()
 
         self.chat_lock = False
+        
+        if need_switch_listen:
+            logger.info("LLM主动触发切换监听模式")
+            self.listening_manager.switch_to_listening()
+        
         logger.info(f"回答完成，总长度: {len(full_response)} 字")
 
         return True
@@ -655,8 +703,14 @@ class StreamRobot(Robot):
         self.first_buffer_start_time = 0.0  # 首次缓冲开始时间
         self.first_buffer_duration = self.stream_tts_config.get("first_buffer_duration", 2.0)  # 首次超长缓冲时间（秒），默认2秒
         
+        # 空闲检测 - 长时间无活动自动断开TTS连接
+        self.last_activity_time = time.time()  # 最后活动时间
+        self.idle_timeout = 300  # 空闲超时时间，单位秒（5分钟）
+        self.idle_check_interval = 60  # 空闲检查间隔，单位秒（1分钟）
+        self._tts_lock = threading.Lock()  # 保护 current_tts_stream 的读写
+        
         self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
-        logger.info(f"已启用流式TTS模式，首次对话自动建连，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒")
+        logger.info(f"已启用流式TTS模式，首次对话自动建连，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒，空闲超时: {self.idle_timeout}秒")
 
     def _tts_priority(self) -> None:
         def shutdown_watcher():
@@ -669,33 +723,63 @@ class StreamRobot(Robot):
 
         watcher = threading.Thread(target=shutdown_watcher, daemon=True)
         watcher.start()
+        
+        def idle_watcher():
+            while not self.stop_event.is_set():
+                try:
+                    current_time = time.time()
+                    if current_time - self.last_activity_time >= self.idle_timeout:
+                        with self._tts_lock:
+                            if (self.current_tts_stream 
+                                and self.current_tts_stream.is_alive()
+                                and current_time - self.last_activity_time >= self.idle_timeout):
+                                logger.info(f"空闲超时{self.idle_timeout}秒，断开TTS连接以节省资源")
+                                self.current_tts_stream.close()
+                                self.current_tts_stream = None
+                                self._tts_initialized = False
+                except Exception as e:
+                    logger.debug(f"空闲检测出错: {e}")
+                
+                time.sleep(self.idle_check_interval)
+
+        idle_watcher_thread = threading.Thread(target=idle_watcher, daemon=True)
+        idle_watcher_thread.start()
 
     def interrupt_playback(self) -> None:
         logger.info("Interrupting current playback and TTS generation.")
         self.pending_shutdown = False
-        if self.current_tts_stream:
-            self.current_tts_stream.reset()
+        with self._tts_lock:
+            if self.current_tts_stream:
+                self.current_tts_stream.reset()
         self.stream_player.clear_buffer()
         self.player.stop()
 
     def _chat_reset_tts(self) -> None:
-        if self.current_tts_stream:
-            self.current_tts_stream.close()
-            self.current_tts_stream = None
         self.stream_player.clear_buffer()
-        self._tts_initialized = False
-        # 重置首次缓冲状态
         self.is_first_buffer = True
         self.first_buffer_start_time = 0.0
         self.stream_buffer = ""
         self.last_stream_flush_time = time.time()
+        
+        with self._tts_lock:
+            if self.current_tts_stream and self.current_tts_stream.is_alive():
+                self.current_tts_stream.reset()
+                self._tts_initialized = True
+            else:
+                self._tts_initialized = False
+                if self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
+                    self._init_stream_connection()
+                    if self.current_tts_stream and self.current_tts_stream.is_alive():
+                        self._tts_initialized = True
 
     def _chat_handle_token(self, content: str) -> None:
-        if not self._tts_initialized and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY and content.strip():
-            self._init_stream_connection()
-            self._tts_initialized = True
-
-        if self.current_tts_stream is not None and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
+        if self.current_tts_stream is None:
+            if self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
+                self._init_stream_connection()
+            if self.current_tts_stream is None:
+                return
+        
+        if self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
             self._check_and_reconnect_stream()
             self.stream_buffer += content
             current_time = time.time()
@@ -742,6 +826,7 @@ class StreamRobot(Robot):
     def _filter_special_tokens(self, content: str) -> str:
         """过滤特殊token"""
         filtered = content.replace(self.EXIT_TOKEN, "")
+        filtered = filtered.replace(self.SWITCH_LISTEN_TOKEN, "")
         if not self.start_task_mode:
             filtered = re.sub(r'```json.*?```', '', filtered, flags=re.DOTALL)
             filtered = re.sub(r'\{\"function_name\".*?\}', '', filtered, flags=re.DOTALL)
@@ -749,21 +834,30 @@ class StreamRobot(Robot):
 
     def _init_stream_connection(self) -> None:
         try:
-            if (self.current_tts_stream is None
-                or self.current_tts_stream.client is None
-                or not self.current_tts_stream.is_alive()):
+            need_connect = False
+            with self._tts_lock:
+                if (self.current_tts_stream is None
+                    or self.current_tts_stream.client is None
+                    or not self.current_tts_stream.is_alive()):
+                    need_connect = True
+                else:
+                    self.current_tts_stream.reset()
+                    logger.debug("复用已有TTS连接")
+                    self.tts_consecutive_fail_count = 0
+                    return
+            
+            if need_connect:
                 now = time.time()
                 if now - self.last_tts_retry_time < self.TTS_RETRY_CD:
                     logger.debug(f"TTS重连冷却中，剩余{self.TTS_RETRY_CD - (now - self.last_tts_retry_time):.0f}秒，放弃本次连接")
                     return
-                self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
-                self.current_tts_stream.connect()
-                self.last_tts_retry_time = 0
+                new_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
+                new_stream.connect()
+                with self._tts_lock:
+                    self.current_tts_stream = new_stream
+                    self.last_tts_retry_time = 0
+                    self.tts_consecutive_fail_count = 0
                 logger.debug("TTS连接初始化完成")
-            else:
-                self.current_tts_stream.reset()
-                logger.debug("复用已有TTS连接")
-            self.tts_consecutive_fail_count = 0
         except Exception as e:
             self.tts_consecutive_fail_count += 1
             logger.error(f"TTS初始化失败（第{self.tts_consecutive_fail_count}次）: {e}")
@@ -771,21 +865,24 @@ class StreamRobot(Robot):
                 logger.error(f"TTS连续失败{self.MAX_TTS_RETRY}次，放弃本次TTS播放，请检查服务状态")
 
     def _check_and_reconnect_stream(self) -> None:
-        if not self.current_tts_stream.is_alive():
-            now = time.time()
-            if now - self.last_tts_retry_time < self.TTS_RETRY_CD:
-                logger.debug(f"TTS重连冷却中，剩余{self.TTS_RETRY_CD - (now - self.last_tts_retry_time):.0f}秒，放弃本次重连")
-                return
-            try:
-                self.current_tts_stream.connect()
-                self.last_tts_retry_time = 0
-                logger.debug("TTS连接断开，自动重连成功")
-            except Exception as e:
-                self.last_tts_retry_time = now
-                self.tts_consecutive_fail_count += 1
-                logger.error(f"TTS重连失败（第{self.tts_consecutive_fail_count}次）: {e}")
-                if self.tts_consecutive_fail_count >= self.MAX_TTS_RETRY:
-                    logger.error(f"TTS连续失败{self.MAX_TTS_RETRY}次，放弃本次TTS播放，请检查服务状态")
+        if self.current_tts_stream.is_alive():
+            return
+        
+        now = time.time()
+        if now - self.last_tts_retry_time < self.TTS_RETRY_CD:
+            logger.debug(f"TTS重连冷却中，剩余{self.TTS_RETRY_CD - (now - self.last_tts_retry_time):.0f}秒，放弃本次重连")
+            return
+        try:
+            self.current_tts_stream.connect()
+            self.last_tts_retry_time = 0
+            logger.debug("TTS连接断开，自动重连成功")
+        except Exception as e:
+            self.last_tts_retry_time = now
+            self.tts_consecutive_fail_count += 1
+            logger.error(f"TTS重连失败（第{self.tts_consecutive_fail_count}次）: {e}")
+            if self.tts_consecutive_fail_count >= self.MAX_TTS_RETRY:
+                logger.error(f"TTS连续失败{self.MAX_TTS_RETRY}次，放弃本次TTS播放，请检查服务状态")
+                with self._tts_lock:
                     self.current_tts_stream = None
 
     def _chat_flush_tts(self) -> None:
@@ -799,7 +896,6 @@ class StreamRobot(Robot):
                             logger.debug(f"首次缓冲提前刷新发送，过滤前:{len(self.stream_buffer)}字，过滤后:{len(filtered_content)}字")
                     except Exception as e:
                         logger.error(f"发送剩余缓冲内容到TTS失败: {e}")
-            # 无论如何，刷新时结束首次缓冲模式
             self.is_first_buffer = False
             self.stream_buffer = ""
             self.last_stream_flush_time = time.time()
@@ -808,22 +904,27 @@ class StreamRobot(Robot):
 
     def _chat_submit_tts(self, full_response: str, need_exit: bool) -> None:
         logger.info(f"LLM回答生成完成，总长度{len(full_response)}字，已流式发送给TTS")
-        self.current_tts_stream.finish(timeout=60)
+        if self.current_tts_stream is not None:
+            self.current_tts_stream.finish(timeout=60)
+        else:
+            logger.warning("TTS连接不可用，跳过快结束")
         if need_exit:
             logger.info("检测到用户退出意图，等流式播放完成后自动关闭...")
             self.pending_shutdown = True
 
     def _chat_tool_token(self, content: str) -> None:
-        if self.current_tts_stream is not None:
-            self.current_tts_stream.append_text(content)
+        with self._tts_lock:
+            if self.current_tts_stream is not None:
+                self.current_tts_stream.append_text(content)
 
     def _cleanup_tts(self) -> None:
-        if self.current_tts_stream:
-            try:
-                self.current_tts_stream.close()
-            except Exception:
-                pass
-            self.current_tts_stream = None
+        with self._tts_lock:
+            if self.current_tts_stream:
+                try:
+                    self.current_tts_stream.close()
+                except Exception:
+                    pass
+                self.current_tts_stream = None
         if self.stream_player is not None:
             try:
                 self.stream_player.stop()
@@ -835,6 +936,8 @@ class StreamRobot(Robot):
             self.current_tts_stream.reset()
 
     def _submit_chat(self, text: str) -> None:
+        # 有对话，更新最后活动时间
+        self.last_activity_time = time.time()
         t = threading.Thread(target=self.chat, args=(text,), daemon=True)
         t.start()
 
