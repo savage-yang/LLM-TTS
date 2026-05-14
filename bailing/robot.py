@@ -86,7 +86,6 @@ class Robot(ABC):
 
         # 初始化监听模式管理器
         self.listening_manager = ListeningModeManager(config, self.llm)
-        logger.info(f"[启动] 监听模式管理器加载完成")
 
         logger.info(f"[启动] 所有模块加载完成，总耗时: {time.time()-start_time:.2f}s")
 
@@ -292,7 +291,8 @@ class Robot(ABC):
         self._tts_priority()
 
         self.last_asr_text = ""
-        self.last_asr_time = 0.0
+        self.last_asr_time = 0
+        self._asr_dedup_lock = threading.Lock()
 
     def _process_asr_result(self, voice_data_list):
         """统一的 ASR 识别+过滤流程（异步，不阻塞 VAD 主循环）"""
@@ -318,11 +318,12 @@ class Robot(ABC):
             return
 
         now = time.time()
-        if text.strip() == self.last_asr_text and now - self.last_asr_time < 1.0:
-            logger.debug(f"重复识别结果已过滤：{text}")
-            return
-        self.last_asr_text = text.strip()
-        self.last_asr_time = now
+        with self._asr_dedup_lock:
+            if text.strip() == self.last_asr_text and now - self.last_asr_time < 1.0:
+                logger.debug(f"重复识别结果已过滤：{text}")
+                return
+            self.last_asr_text = text.strip()
+            self.last_asr_time = now
 
         end_time = time.time()
         start_time = end_time - len(voice_data) * 0.032
@@ -331,6 +332,9 @@ class Robot(ABC):
 
         if processed_text is not None and processed_text.strip():
             logger.debug(f"ASR识别结果(对话模式): {processed_text}")
+            if self.chat_lock:
+                logger.debug("对话模式已有对话进行中，忽略本次ASR结果")
+                return
             if self.callback:
                 self.callback({"role": "user", "content": str(processed_text)})
             self._submit_chat(processed_text)
@@ -358,7 +362,6 @@ class Robot(ABC):
 
         if vad_status is not None:
             self.last_voice_time = current_time
-            # VAD检测到声音，更新最后活动时间
             if hasattr(self, 'last_activity_time'):
                 self.last_activity_time = time.time()
 
@@ -370,6 +373,7 @@ class Robot(ABC):
                 self._process_asr_result(speech)
                 return
             self.speech.append(data)
+            self.last_voice_time = current_time
 
         if self.task_queue is not None and not self.task_queue.empty() and not self.vad_start \
                 and not self.player.get_playing_status() and not self.chat_lock:
@@ -587,7 +591,6 @@ class Robot(ABC):
             need_exit = True
             logger.debug(f"检测到退出标记，已过滤，need_exit设为True")
         
-        # 检测切换监听模式标记
         full_response = full_response.replace(self.SWITCH_LISTEN_TOKEN, "").strip()
         if self.SWITCH_LISTEN_TOKEN in raw_full_response:
             need_switch_listen = True
@@ -937,7 +940,6 @@ class StreamRobot(Robot):
             self.current_tts_stream.reset()
 
     def _submit_chat(self, text: str) -> None:
-        # 有对话，更新最后活动时间
         self.last_activity_time = time.time()
         t = threading.Thread(target=self.chat, args=(text,), daemon=True)
         t.start()
