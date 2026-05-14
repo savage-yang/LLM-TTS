@@ -27,8 +27,17 @@ class ListeningModeManager:
         self.summary_manager = SummaryManager(config)
 
         self.mode = "listening"
-        self.wake_word = config.get("WakeWord", "百聆")
-        self.wake_word_variants = {self.wake_word, "百灵", "百玲", "百零"}
+        self.wake_word = config.get("WakeWord", "塔菲")
+        # 唤醒词同音字变体（ASR 可能识别为同音不同字）
+        self.wake_word_variants = {
+            self.wake_word,
+            # 标准变体
+            "塔飞", "塔霏",
+            # 常见误识别
+            "踏菲", "她菲", "他菲",
+                # 近音字
+            "泰菲", "太菲", "台菲"
+        }
 
         listening_config = config.get("ListeningMode", {})
         self.summary_interval = listening_config.get("summary_interval", 300)
@@ -88,13 +97,13 @@ class ListeningModeManager:
 
     def process_asr_result(
         self, text: str, start_time: float, end_time: float
-    ) -> Optional[str]:
+    ) -> tuple[Optional[str], bool]:
         with self._lock:
             return self._process_asr_result_locked(text, start_time, end_time)
 
     def _process_asr_result_locked(
         self, text: str, start_time: float, end_time: float
-    ) -> Optional[str]:
+    ) -> tuple[Optional[str], bool]:
         if self.mode == "listening":
             matched = self._match_wake_word(text.strip())
             if matched is not None:
@@ -104,13 +113,13 @@ class ListeningModeManager:
                 cleaned = text.strip().replace(matched, "").strip()
                 if not cleaned:
                     logger.debug("仅检测到唤醒词，无后续内容，忽略")
-                    return None
-                return cleaned
+                    return None, False
+                return cleaned, True
 
             self.summary_manager.add_listening_item(text, start_time, end_time)
             self.total_word_count += len(text)
             self._check_trigger_summary_locked()
-            return None
+            return None, False
         else:
             current_time = time.time()
             if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
@@ -119,11 +128,11 @@ class ListeningModeManager:
                 return self._process_as_listening_locked(text, start_time, end_time)
 
             self.last_dialogue_time = current_time
-            return text
+            return text, False
 
     def _process_as_listening_locked(
         self, text: str, start_time: float, end_time: float
-    ) -> Optional[str]:
+    ) -> tuple[Optional[str], bool]:
         matched = self._match_wake_word(text.strip())
         if matched is not None:
             self.mode = "dialogue"
@@ -131,13 +140,13 @@ class ListeningModeManager:
             logger.info("切换到对话模式")
             cleaned = text.strip().replace(matched, "").strip()
             if not cleaned:
-                return None
-            return cleaned
+                return None, False
+            return cleaned, True
 
         self.summary_manager.add_listening_item(text, start_time, end_time)
         self.total_word_count += len(text)
         self._check_trigger_summary_locked()
-        return None
+        return None, False
 
     def _check_trigger_summary_locked(self):
         """检查是否满足触发总结的条件（定时或定量）"""

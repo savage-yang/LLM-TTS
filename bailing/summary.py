@@ -78,9 +78,11 @@ class SummaryManager:
         with self._items_lock:
             word_count = sum(len(item["text"]) for item in self.listening_items)
             item_count = len(self.listening_items)
-            self._save_summary(summary_text, word_count, item_count)
-            self._save_raw_items()
+            items_snapshot = list(self.listening_items)
             self.listening_items = []
+
+        self._save_summary(summary_text, word_count, item_count)
+        self._save_raw_items(items_snapshot)
 
     def _save_summary(self, summary_text: str, word_count: int, item_count: int) -> None:
         """
@@ -105,10 +107,10 @@ class SummaryManager:
         except Exception as e:
             logger.error(f"保存总结失败：{e}")
 
-    def _save_raw_items(self) -> None:
-        """将当前监听池原始内容保存到 JSON 文件"""
+    def _save_raw_items(self, items: list) -> None:
+        """将监听池原始内容保存到 JSON 文件"""
         try:
-            write_json_file(self.current_raw_file, self.listening_items)
+            write_json_file(self.current_raw_file, items)
             logger.info(f"原始监听内容已保存：{self.current_raw_file}")
         except Exception as e:
             logger.error(f"保存原始监听内容失败：{e}")

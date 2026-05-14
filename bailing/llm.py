@@ -137,7 +137,7 @@ class LocalLLM(LLM):
                 if content:
                     yield content
         except Exception as e:
-            logger.error(f"OllamaLLM stream error: {e}")
+            logger.error(f"LocalLLM response error: {e}")
             raise
 
     def response_call(
@@ -183,7 +183,7 @@ class LocalLLM(LLM):
                 tool_calls = msg.get("tool_calls")
                 yield content, tool_calls
         except Exception as e:
-            logger.error(f"OllamaLLM tool-call error: {e}")
+            logger.error(f"LocalLLM response_call error: {e}")
             raise
 
 

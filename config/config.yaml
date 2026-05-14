@@ -1,11 +1,11 @@
-name: 百聆（bailing）
+name: 塔菲（Tafi）
 version: 1.0
 
 logging:
   level: info
 
 # 唤醒词
-WakeWord: 百聆
+WakeWord: 塔菲
 
 interrupt: true
 # 是否开启工具调用
@@ -33,8 +33,8 @@ ASR:
 VAD:
   SileroVAD:
     sampling_rate: 16000
-    threshold: 0.70
-    min_silence_duration_ms: 1500  # 如果说话停顿比较长，可以把这个值设大一些
+    threshold: 0.65
+    min_silence_duration_ms: 1200  # 如果说话停顿比较长，可以把这个值设大一些
 
 LLM:
   OpenAILLM:

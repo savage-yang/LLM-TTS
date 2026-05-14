@@ -2,6 +2,7 @@ import json
 import os
 import re
 import signal
+import sys
 import queue
 import threading
 import uuid
@@ -293,6 +294,7 @@ class Robot(ABC):
         self.last_asr_text = ""
         self.last_asr_time = 0
         self._asr_dedup_lock = threading.Lock()
+        self._wakeup_playing = False
 
     def _process_asr_result(self, voice_data_list):
         """统一的 ASR 识别+过滤流程（异步，不阻塞 VAD 主循环）"""
@@ -328,7 +330,7 @@ class Robot(ABC):
         end_time = time.time()
         start_time = end_time - len(voice_data) * 0.032
 
-        processed_text = self.listening_manager.process_asr_result(text, start_time, end_time)
+        processed_text, is_wake_transition = self.listening_manager.process_asr_result(text, start_time, end_time)
 
         if processed_text is not None and processed_text.strip():
             logger.debug(f"ASR识别结果(对话模式): {processed_text}")
@@ -337,12 +339,7 @@ class Robot(ABC):
                 return
             if self.callback:
                 self.callback({"role": "user", "content": str(processed_text)})
-            self._submit_chat(processed_text)
-        elif processed_text is not None:
-            logger.debug(f"ASR识别结果(对话模式，但内容为空，忽略)")
-        elif not self.listening_manager.is_listening_mode():
-            logger.debug(f"检测到唤醒词「百聆」，播放唤醒音效，等待后续对话")
-            self._play_wakeup_sound()
+            self._submit_chat(processed_text, play_wakeup=is_wake_transition)
         else:
             logger.debug(f"ASR识别结果(监听模式): {text}")
 
@@ -385,7 +382,7 @@ class Robot(ABC):
 
         if "start" in vad_status:
             self.last_voice_time = current_time
-            if self.player.get_playing_status() or self.chat_lock:
+            if (self.player.get_playing_status() or self.chat_lock) and not getattr(self, '_wakeup_playing', False):
                 if self.INTERRUPT:
                     self.chat_lock = False
                     self.interrupt_playback()
@@ -535,7 +532,7 @@ class Robot(ABC):
                 logger.error(f"not found action type: {result.action}")
         return response_message
 
-    def chat(self, query: str) -> Optional[bool]:
+    def chat(self, query: str, play_wakeup: bool = False) -> Optional[bool]:
         self.dialogue.put(Message(role="user", content=query))
         self.chat_lock = True
 
@@ -543,16 +540,21 @@ class Robot(ABC):
 
         buffer_finish_event, buffer_played = threading.Event(), False
         buffer_finish_event.set()
-        query_length = len(query.strip())
-        threshold = self.buffer_sound_config.get("threshold_length", 15)
 
-        if query_length >= threshold:
-            buffer_finish_event, buffer_played = self.player.play_buffer_sound(
-                buffer_config=self.buffer_sound_config,
-                executor=self._executor_for_prologue()
-            )
-            if buffer_played:
-                logger.debug(f"问题长度{query_length}≥阈值{threshold}，已触发缓冲音效")
+        if play_wakeup:
+            self._wakeup_playing = True
+            self._play_wakeup_sound()
+            buffer_played = True
+        else:
+            query_length = len(query.strip())
+            threshold = self.buffer_sound_config.get("threshold_length", 15)
+            if query_length >= threshold:
+                buffer_finish_event, buffer_played = self.player.play_buffer_sound(
+                    buffer_config=self.buffer_sound_config,
+                    executor=self._executor_for_prologue()
+                )
+                if buffer_played:
+                    logger.debug(f"问题长度{query_length}≥阈值{threshold}，已触发缓冲音效")
 
         self._chat_reset_tts()
 
@@ -563,6 +565,7 @@ class Robot(ABC):
         if self.start_task_mode:
             response_message = self.chat_tool(query)
         else:
+            self._wakeup_playing = False
             try:
                 llm_responses = self.llm.response(self.dialogue.get_llm_dialogue())
             except Exception as e:
@@ -655,7 +658,6 @@ class Robot(ABC):
             logger.error(f"清理资源时出现错误: {e}", exc_info=True)
 
         finally:
-            import sys
             try:
                 sys.exit(0)
             except:
@@ -939,9 +941,9 @@ class StreamRobot(Robot):
         if self.current_tts_stream is not None:
             self.current_tts_stream.reset()
 
-    def _submit_chat(self, text: str) -> None:
+    def _submit_chat(self, text: str, play_wakeup: bool = False) -> None:
         self.last_activity_time = time.time()
-        t = threading.Thread(target=self.chat, args=(text,), daemon=True)
+        t = threading.Thread(target=self.chat, args=(text, play_wakeup), daemon=True)
         t.start()
 
     def _submit_task_tts(self, response: str) -> None:
@@ -1084,8 +1086,8 @@ class LocalRobot(Robot):
     def _on_llm_error(self) -> None:
         pass
 
-    def _submit_chat(self, text: str) -> None:
-        self.executor.submit(self.chat, text)
+    def _submit_chat(self, text: str, play_wakeup: bool = False) -> None:
+        self.executor.submit(self.chat, text, play_wakeup)
 
     def _submit_task_tts(self, response: str) -> None:
         self._tts_generating = True
@@ -1109,7 +1111,7 @@ def create_robot(config_file: str, websocket: Optional[Any] = None, loop: Option
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="百聆机器人")
+    parser = argparse.ArgumentParser(description="塔菲机器人")
     parser.add_argument('config_path', type=str, help="配置文件", default=None)
     args = parser.parse_args()
     config_path = args.config_path

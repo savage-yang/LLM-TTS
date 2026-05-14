@@ -4,6 +4,11 @@ import re
 from typing import Dict, Any, Optional, Tuple, List
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def load_prompt(prompt_path: str) -> str:
     """
     读取提示词文件并返回内容
@@ -34,7 +39,7 @@ def read_json_file(file_path: str) -> Optional[Dict[str, Any]]:
             data = json.load(file)
             return data
         except json.JSONDecodeError as e:
-            print(f"解析 JSON 时出错: {e}")
+            logger.error(f"解析 JSON 时出错: {e}")
             return None
 
 

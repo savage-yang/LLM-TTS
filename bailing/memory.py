@@ -174,32 +174,20 @@ class Memory:
     def read_dialogues_in_order(self, directory: str) -> None:
         """
         读取指定目录下的对话文件，检查是否有新对话需要处理
-        
+
         Args:
             directory: 对话历史文件目录
         """
-        # 获取所有符合命名规则的文件路径
         pattern = os.path.join(directory, 'dialogue-*.json')
         files = glob.glob(pattern)
-
-        # 按时间排序
         files.sort(key=lambda x: self.extract_time_from_filename(os.path.basename(x)))
-        
-        # 只保留最新的1个对话文件，忽略所有旧文件
         if files:
             files = [files[-1]]
             logger.info(f"检查最新对话文件: {files[0]}")
 
-        # 检查是否有新对话文件
-        has_new_dialogue = False
         processed_files = set(self.memory["history_memory_file"])
         for file_path in files:
             if file_path in processed_files:
                 logger.info(f"{file_path} 对话历史已形成记忆")
                 continue
             logger.info(f"发现新对话文件: {file_path}，将在对话结束后自动生成记忆")
-            has_new_dialogue = True
-        
-        # 如果有新对话，标记但不立即处理（避免启动时耗时）
-        if has_new_dialogue:
-            logger.info("新对话将在下次对话结束时自动总结")

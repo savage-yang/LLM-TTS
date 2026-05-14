@@ -11,6 +11,7 @@ import numpy as np
 import os
 import time
 import pyaudio
+import io
 from typing import Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -218,8 +219,6 @@ class PygamePlayer(AbstractPlayer):
             duration: 静音时长（毫秒）
         """
         try:
-            import numpy as np
-            import io
             sample_rate = 24000
             silence = np.zeros(int(sample_rate * duration / 1000), dtype=np.int16)
             buffer = io.BytesIO()
