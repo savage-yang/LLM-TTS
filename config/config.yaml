@@ -1,11 +1,11 @@
-name: 塔菲（Tafi）
+name: 小爱（XiaoAi）
 version: 1.0
 
 logging:
   level: info
 
 # 唤醒词
-WakeWord: 塔菲
+WakeWord: 小爱
 
 interrupt: true
 # 是否开启工具调用
@@ -103,7 +103,7 @@ BufferSound:
 # 监听模式配置
 ListeningMode:
   enabled: true
-  summary_interval: 100 # 自动总结间隔（秒），默认5分钟
+  summary_interval: 60 # 自动总结间隔（秒），默认1分钟
   summary_word_threshold: 300 # 自动总结字数阈值
-  dialogue_idle_timeout: 120 # 对话模式空闲超时（秒），超时自动切回监听模式
+  dialogue_idle_timeout: 90 # 对话模式空闲超时（秒），超时自动切回监听模式
   summary_save_path: "./tmp/listening_summaries"

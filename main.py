@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-塔菲智能语音助手 - 主程序入口
+小爱智能语音助手 - 主程序入口
 @Author: 寒江雪
 @Date: 2026-05-09
 """
@@ -69,7 +69,7 @@ def setup_logging(config_path: str = "config/config.yaml") -> None:
 def main() -> None:
     """主程序入口"""
     # 解析命令行参数
-    parser = argparse.ArgumentParser(description="塔菲智能语音助手")
+    parser = argparse.ArgumentParser(description="小爱智能语音助手")
     parser.add_argument(
         '--config-path', 
         type=str, 
@@ -85,7 +85,7 @@ def main() -> None:
     # 初始化日志
     setup_logging(args.config_path)
     logger = logging.getLogger(__name__)
-    logger.info("塔菲智能语音助手启动中...")
+    logger.info("小爱智能语音助手启动中...")
 
     # 检查配置文件是否存在
     if not os.path.exists(args.config_path):

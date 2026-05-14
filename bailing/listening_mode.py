@@ -27,16 +27,14 @@ class ListeningModeManager:
         self.summary_manager = SummaryManager(config)
 
         self.mode = "listening"
-        self.wake_word = config.get("WakeWord", "塔菲")
+        self.wake_word = config.get("WakeWord", "小爱")
         # 唤醒词同音字变体（ASR 可能识别为同音不同字）
         self.wake_word_variants = {
             self.wake_word,
-            # 标准变体
-            "塔飞", "塔霏",
             # 常见误识别
-            "踏菲", "她菲", "他菲",
-                # 近音字
-            "泰菲", "太菲", "台菲"
+            "小艾", "小暧", "晓爱", "筱爱",
+            # 近音字
+            "肖爱", "笑爱", "孝爱"
         }
 
         listening_config = config.get("ListeningMode", {})
@@ -174,8 +172,8 @@ class ListeningModeManager:
         """
         raw_text = self.summary_manager.get_raw_text()
         if not raw_text:
-            with self._lock:
-                self._summarizing = False
+            # 已在持有锁的上下文中调用，无需再次获取锁
+            self._summarizing = False
             return
 
         def do_summary():

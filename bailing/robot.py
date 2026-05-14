@@ -348,7 +348,9 @@ class Robot(ABC):
         wakeup_path = os.path.join(root_path, "voice_cache", "wakeup.wav")
         if os.path.exists(wakeup_path):
             logger.debug("播放唤醒音效")
-            threading.Thread(target=self.player.play, args=(wakeup_path,), daemon=True).start()
+            self.player.play(wakeup_path)
+            while self.player.get_playing_status():
+                time.sleep(0.05)
         else:
             logger.debug(f"唤醒音效文件不存在：{wakeup_path}")
 
@@ -713,7 +715,7 @@ class StreamRobot(Robot):
         self.last_activity_time = time.time()  # 最后活动时间
         self.idle_timeout = 300  # 空闲超时时间，单位秒（5分钟）
         self.idle_check_interval = 60  # 空闲检查间隔，单位秒（1分钟）
-        self._tts_lock = threading.Lock()  # 保护 current_tts_stream 的读写
+        self._tts_lock = threading.RLock()  # 保护 current_tts_stream 的读写（可重入，避免同一线程重复申请死锁）
         
         self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
         logger.info(f"已启用流式TTS模式，首次对话自动建连，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒，空闲超时: {self.idle_timeout}秒")
@@ -1111,7 +1113,7 @@ def create_robot(config_file: str, websocket: Optional[Any] = None, loop: Option
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="塔菲机器人")
+    parser = argparse.ArgumentParser(description="小爱机器人")
     parser.add_argument('config_path', type=str, help="配置文件", default=None)
     args = parser.parse_args()
     config_path = args.config_path
