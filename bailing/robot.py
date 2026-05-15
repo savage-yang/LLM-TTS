@@ -854,7 +854,7 @@ class StreamRobot(Robot):
         filtered = content.replace(self.EXIT_TOKEN, "")
         filtered = filtered.replace(self.SWITCH_LISTEN_TOKEN, "")
         filtered = filtered.replace(self.PUSH_TOKEN, "")
-        filtered = re.sub(r'^(标题|时间|地点|内容)[：:]\s*.+\n?', '', filtered, flags=re.MULTILINE)
+        filtered = re.sub(r'(?:标题|时间|地点|内容)[：:][^好请行]*?(?=好|请|$)', '', filtered)
         if not self.start_task_mode:
             filtered = re.sub(r'```json.*?```', '', filtered, flags=re.DOTALL)
             filtered = re.sub(r'\{\"function_name\".*?\}', '', filtered, flags=re.DOTALL)
