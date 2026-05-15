@@ -51,6 +51,9 @@ class ListeningModeManager:
         self.total_word_count = 0
         self._summarizing = False
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._timer_thread = threading.Thread(target=self._summary_timer_loop, daemon=True)
+        self._timer_thread.start()
 
         logger.info(f"ListeningModeManager initialized，初始化完成")
 
@@ -149,6 +152,15 @@ class ListeningModeManager:
         self.total_word_count += len(text)
         self._check_trigger_summary_locked()
         return None, False
+
+    def _summary_timer_loop(self):
+        """后台定时器循环，独立于ASR输入定期检查总结条件"""
+        while not self._stop_event.is_set():
+            self._stop_event.wait(5)
+            with self._lock:
+                if self.mode != "listening":
+                    continue
+                self._check_trigger_summary_locked()
 
     def _check_trigger_summary_locked(self):
         """检查是否满足触发总结的条件（定时或定量）"""
