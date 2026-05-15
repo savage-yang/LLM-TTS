@@ -130,28 +130,11 @@ class ListeningModeManager:
             if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
                 logger.info(f"对话模式空闲超过{self.dialogue_idle_timeout}秒，自动切回监听模式")
                 self.mode = "listening"
-                return self._process_as_listening_locked(text, start_time, end_time)
+                logger.debug("模式切换时的ASR结果不加入监听池")
+                return None, False
 
             self.last_dialogue_time = current_time
             return text, False
-
-    def _process_as_listening_locked(
-        self, text: str, start_time: float, end_time: float
-    ) -> tuple[Optional[str], bool]:
-        matched = self._match_wake_word(text.strip())
-        if matched is not None:
-            self.mode = "dialogue"
-            self.last_dialogue_time = time.time()
-            logger.info("切换到对话模式")
-            cleaned = text.strip().replace(matched, "").strip()
-            if not cleaned:
-                return None, False
-            return cleaned, True
-
-        self.summary_manager.add_listening_item(text, start_time, end_time)
-        self.total_word_count += len(text)
-        self._check_trigger_summary_locked()
-        return None, False
 
     def _summary_timer_loop(self):
         """后台定时器循环，独立于ASR输入定期检查总结条件"""
