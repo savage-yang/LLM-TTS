@@ -107,3 +107,10 @@ ListeningMode:
   summary_word_threshold: 300 # 自动总结字数阈值
   dialogue_idle_timeout: 90 # 对话模式空闲超时（秒），超时自动切回监听模式
   summary_save_path: "./tmp/listening_summaries"
+
+# Bark推送配置（iOS推送服务，下载App后填入你的设备Key即可）
+BarkNotify:
+  enabled: true
+  device_key: "RvwBvdEmy9ybHxUJ5FJaLZ" # 替换为你的Bark设备Key，从Bark App首页获取
+  base_url: "https://api.day.app" # Bark服务器地址
+  icon: "https://raw.githubusercontent.com/savage-yang/LLM-TTS/master/assets/picture1_thumb.jpg" # 自定义图标（HTTPS URL或SF Symbol名称）

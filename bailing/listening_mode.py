@@ -14,16 +14,20 @@ class ListeningModeManager:
     以及监听池的自动总结
     """
 
-    def __init__(self, config: Dict[str, Any], llm):
+    PUSH_TOKEN = "<|PUSH_NOTIFICATION|>"
+
+    def __init__(self, config: Dict[str, Any], llm, bark_notifier=None):
         """
         初始化监听模式管理器
 
         Args:
             config: 配置字典，包含 WakeWord 和 ListeningMode 配置
             llm: LLM 实例，用于生成监听内容总结
+            bark_notifier: BarkNotifier 实例，用于推送重要信息到手机
         """
         self.config = config
         self.llm = llm
+        self.bark_notifier = bark_notifier
         self.summary_manager = SummaryManager(config)
 
         self.mode = "listening"
@@ -155,10 +159,10 @@ class ListeningModeManager:
         reason = ""
         if current_time - self.last_summary_time >= self.summary_interval:
             need_summary = True
-            reason = f"定时总结"
-        if self.total_word_count >= self.summary_word_threshold:
+            reason = "定时总结"
+        elif self.total_word_count >= self.summary_word_threshold:
             need_summary = True
-            reason = f"字数达标总结"
+            reason = "字数达标总结"
         if need_summary:
             self._summarizing = True
             logger.info(f"触发总结：{reason}")
@@ -186,6 +190,12 @@ class ListeningModeManager:
                 )
                 final_summary = "".join(llm_response)
                 logger.info(f"监听内容总结完成：\n{final_summary}")
+
+                if self.PUSH_TOKEN in final_summary:
+                    push_content = final_summary.replace(self.PUSH_TOKEN, "").strip()
+                    if self.bark_notifier:
+                        self.bark_notifier.send_formatted(push_content)
+                    final_summary = push_content
 
                 self.summary_manager.add_summary(final_summary)
                 with self._lock:

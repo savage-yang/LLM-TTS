@@ -25,6 +25,7 @@ from bailing.dialogue import Message, Dialogue
 from bailing.utils import read_config, extract_json_from_string
 from bailing.prompt import sys_prompt
 from bailing.listening_mode import ListeningModeManager
+from bailing.bark_notify import BarkNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 class Robot(ABC):
     EXIT_TOKEN = "<|EXIT_PROGRAM|>"
     SWITCH_LISTEN_TOKEN = "<|SWITCH_LISTEN|>"
+    PUSH_TOKEN = "<|PUSH_NOTIFICATION|>"
 
     def __init__(self, config_file: str, websocket: Optional[Any] = None, loop: Optional[Any] = None):
         config = read_config(config_file)
@@ -85,8 +87,16 @@ class Robot(ABC):
         self.memory = Memory(config.get("Memory"))
         logger.info(f"[启动] 记忆模块加载完成，耗时: {time.time()-t7:.2f}s")
 
+        # 初始化Bark推送器
+        bark_config = config.get("BarkNotify", {})
+        self.bark_notifier = BarkNotifier(
+            device_key=bark_config.get("device_key", ""),
+            base_url=bark_config.get("base_url", "https://api.day.app"),
+            icon=bark_config.get("icon", "")
+        )
+
         # 初始化监听模式管理器
-        self.listening_manager = ListeningModeManager(config, self.llm)
+        self.listening_manager = ListeningModeManager(config, self.llm, bark_notifier=self.bark_notifier)
 
         logger.info(f"[启动] 所有模块加载完成，总耗时: {time.time()-start_time:.2f}s")
 
@@ -563,6 +573,7 @@ class Robot(ABC):
         response_message = []
         need_exit = False
         need_switch_listen = False
+        need_push = False
 
         if self.start_task_mode:
             response_message = self.chat_tool(query)
@@ -600,6 +611,11 @@ class Robot(ABC):
         if self.SWITCH_LISTEN_TOKEN in raw_full_response:
             need_switch_listen = True
             logger.debug(f"检测到切换监听标记，已过滤，need_switch_listen设为True")
+
+        full_response = full_response.replace(self.PUSH_TOKEN, "").strip()
+        if self.PUSH_TOKEN in raw_full_response:
+            need_push = True
+            logger.debug(f"检测到推送标记，已过滤，need_push设为True")
 
         if full_response and len(full_response) > 2:
             end_char = full_response[-1]
@@ -647,6 +663,9 @@ class Robot(ABC):
         if need_switch_listen:
             logger.info("LLM主动触发切换监听模式")
             self.listening_manager.switch_to_listening()
+
+        if need_push:
+            threading.Thread(target=self._do_push_notification, args=(full_response,), daemon=True).start()
         
         logger.info(f"回答完成，总长度: {len(full_response)} 字")
 
@@ -835,6 +854,8 @@ class StreamRobot(Robot):
         """过滤特殊token"""
         filtered = content.replace(self.EXIT_TOKEN, "")
         filtered = filtered.replace(self.SWITCH_LISTEN_TOKEN, "")
+        filtered = filtered.replace(self.PUSH_TOKEN, "")
+        filtered = re.sub(r'^(标题|时间|地点|内容)[：:]\s*.+\n?', '', filtered, flags=re.MULTILINE)
         if not self.start_task_mode:
             filtered = re.sub(r'```json.*?```', '', filtered, flags=re.DOTALL)
             filtered = re.sub(r'\{\"function_name\".*?\}', '', filtered, flags=re.DOTALL)
@@ -919,6 +940,9 @@ class StreamRobot(Robot):
         if need_exit:
             logger.info("检测到用户退出意图，等流式播放完成后自动关闭...")
             self.pending_shutdown = True
+
+    def _do_push_notification(self, content: str) -> None:
+        self.bark_notifier.send_formatted(content)
 
     def _chat_tool_token(self, content: str) -> None:
         with self._tts_lock:
