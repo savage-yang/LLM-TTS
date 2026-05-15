@@ -113,4 +113,4 @@ BarkNotify:
   enabled: true
   device_key: "RvwBvdEmy9ybHxUJ5FJaLZ" # 替换为你的Bark设备Key，从Bark App首页获取
   base_url: "https://api.day.app" # Bark服务器地址
-  icon: "https://raw.githubusercontent.com/savage-yang/LLM-TTS/master/assets/icon_512.jpg" # 自定义图标（HTTPS URL或SF Symbol名称）- 高质量512x512版本
+  icon: "https://raw.githubusercontent.com/savage-yang/LLM-TTS/master/assets/icon_bark.jpg" # 自定义图标（<4KB，128x128）
