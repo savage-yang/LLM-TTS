@@ -113,4 +113,3 @@ BarkNotify:
   enabled: true
   device_key: "RvwBvdEmy9ybHxUJ5FJaLZ" # 替换为你的Bark设备Key，从Bark App首页获取
   base_url: "https://api.day.app" # Bark服务器地址
-  icon: "bell" # SF Symbol名称（推荐：bell/message/calendar/star.fill等，无需网络）

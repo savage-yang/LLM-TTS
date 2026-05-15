@@ -91,8 +91,7 @@ class Robot(ABC):
         bark_config = config.get("BarkNotify", {})
         self.bark_notifier = BarkNotifier(
             device_key=bark_config.get("device_key", ""),
-            base_url=bark_config.get("base_url", "https://api.day.app"),
-            icon=bark_config.get("icon", "")
+            base_url=bark_config.get("base_url", "https://api.day.app")
         )
 
         # 初始化监听模式管理器

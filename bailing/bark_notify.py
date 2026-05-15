@@ -8,23 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 class BarkNotifier:
-    MAX_ICON_SIZE_KB = 4
-
-    def __init__(self, device_key: str, base_url: str = "https://api.day.app", icon: str = ""):
+    def __init__(self, device_key: str, base_url: str = "https://api.day.app"):
         self.device_key = device_key
         self.base_url = base_url.rstrip("/")
-        self.icon = icon
         self._enabled = bool(device_key)
 
-    def _resolve_icon(self, icon_override: str = None) -> str:
-        icon_path = icon_override or self.icon
-        if not icon_path:
-            return ""
-        if icon_path.startswith("http://") or icon_path.startswith("https://"):
-            return icon_path
-        return ""
-
-    def send(self, title: str, body: str = "", group: str = "小爱助手", icon: str = "") -> bool:
+    def send(self, title: str, body: str = "", group: str = "小爱助手") -> bool:
         if not self._enabled:
             logger.debug("Bark未配置device_key，跳过推送")
             return False
@@ -35,9 +24,6 @@ class BarkNotifier:
         params = {}
         if group:
             params["group"] = group
-        resolved_icon = self._resolve_icon(icon)
-        if resolved_icon:
-            params["icon"] = resolved_icon
 
         try:
             resp = requests.get(url, params=params, timeout=10)
