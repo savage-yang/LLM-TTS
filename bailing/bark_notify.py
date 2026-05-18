@@ -55,10 +55,10 @@ class BarkNotifier:
     def _parse(content: str) -> Dict[str, str]:
         info: Dict[str, str] = {}
         patterns = {
-            "title": r"标题[：:]\s*(.+)",
-            "time": r"时间[：:]\s*(.+)",
-            "location": r"地点[：:]\s*(.+)",
-            "detail": r"内容[：:]\s*(.+)",
+            "title": r"标题[：:](.+?)(?=\s*(?:时间|日期|地点|内容)|$)",
+            "time": r"(?:时间|日期)[：:](.+?)(?=\s*(?:标题|地点|内容)|$)",
+            "location": r"地点[：:](.+?)(?=\s*(?:标题|时间|日期|内容)|$)",
+            "detail": r"内容[：:](.+?)(?=\s*(?:标题|时间|日期|地点)|$)",
         }
         for key, pattern in patterns.items():
             match = re.search(pattern, content)

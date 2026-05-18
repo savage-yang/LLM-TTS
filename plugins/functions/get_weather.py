@@ -1,8 +1,11 @@
+import logging
 import requests
 from bs4 import BeautifulSoup
 
 from plugins.registry import register_function, ToolType
 from plugins.registry import ActionResponse, Action
+
+logger = logging.getLogger(__name__)
 
 @register_function('get_weather', ToolType.WAIT)
 def get_weather(city: str):
@@ -24,7 +27,7 @@ def get_weather(city: str):
         weather = weather.replace("墨迹天气", "")
         return ActionResponse(Action.REQLLM, weather, weather)
     except Exception as e:
-        print(f"天气查询出错: {e}")
+        logger.error(f"天气查询出错: {e}")
         return ActionResponse(Action.REQLLM, None, "天气查询服务暂时不可用，请稍后再试")
 
 if __name__ == "__main__":

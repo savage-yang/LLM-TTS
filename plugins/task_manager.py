@@ -116,8 +116,8 @@ class TaskManager:
             try:
                 result = self.call_function( func_name, **func_args)
             except Exception as e:
-                logger.error(f"{func_name}, {func_args}, {func_args}, {e}")
-            return ActionResponse(action=Action.REQLLM, result=result.response, response=result.response)
+                logger.error(f"工具调用失败 {func_name}, 参数: {func_args}, 错误: {e}")
+                return ActionResponse(action=Action.REQLLM, result=f"工具调用失败: {e}", response=f"工具调用失败: {e}")
         elif func.action == ToolType.SCHEDULER: # = (3, "定时任务，时间到了之后，直接回复")
             result = self.call_function(func_name, **func_args)
             return ActionResponse(action=Action.RESPONSE, result=result.response, response=result.response)

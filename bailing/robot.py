@@ -611,10 +611,34 @@ class Robot(ABC):
             need_switch_listen = True
             logger.debug(f"检测到切换监听标记，已过滤，need_switch_listen设为True")
 
+        push_content = ""
         full_response = full_response.replace(self.PUSH_TOKEN, "").strip()
         if self.PUSH_TOKEN in raw_full_response:
             need_push = True
             logger.debug(f"检测到推送标记，已过滤，need_push设为True")
+            json_start = full_response.find("{")
+            json_end = full_response.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = full_response[json_start:json_end]
+                try:
+                    push_data = json.loads(json_str)
+                    reply_text = push_data.get("reply", "")
+                    parts = []
+                    if push_data.get("title"):
+                        parts.append(f"标题：{push_data['title']}")
+                    if push_data.get("time"):
+                        parts.append(f"时间：{push_data['time']}")
+                    if push_data.get("location"):
+                        parts.append(f"地点：{push_data['location']}")
+                    if push_data.get("detail"):
+                        parts.append(f"内容：{push_data['detail']}")
+                    push_content = "\n".join(parts)
+                    full_response = reply_text.strip() if reply_text.strip() else push_content
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning("PUSH JSON解析失败，使用原始文本")
+                    push_content = full_response
+            else:
+                push_content = full_response
 
         if full_response and len(full_response) > 2:
             end_char = full_response[-1]
@@ -664,7 +688,7 @@ class Robot(ABC):
             self.listening_manager.switch_to_listening()
 
         if need_push:
-            threading.Thread(target=self._do_push_notification, args=(full_response,), daemon=True).start()
+            threading.Thread(target=self._do_push_notification, args=(push_content,), daemon=True).start()
         
         logger.info(f"回答完成，总长度: {len(full_response)} 字")
 
@@ -725,10 +749,12 @@ class StreamRobot(Robot):
         self.stream_buffer_duration = self.stream_tts_config.get("stream_buffer_duration", 0.3)
         
         # 首次缓冲机制 - 从 TTS 配置中读取
-        self.is_first_buffer = True  # 是否是首次缓冲
-        self.first_buffer_start_time = 0.0  # 首次缓冲开始时间
-        self.first_buffer_duration = self.stream_tts_config.get("first_buffer_duration", 2.0)  # 首次超长缓冲时间（秒），默认2秒
-        
+        self.is_first_buffer = True
+        self.first_buffer_start_time = 0.0
+        self.first_buffer_duration = self.stream_tts_config.get("first_buffer_duration", 2.0)
+        self._push_skip_mode = False
+        self._push_done = False
+
         # 空闲检测 - 长时间无活动自动断开TTS连接
         self.last_activity_time = time.time()  # 最后活动时间
         self.idle_timeout = 300  # 空闲超时时间，单位秒（5分钟）
@@ -785,6 +811,8 @@ class StreamRobot(Robot):
         self.is_first_buffer = True
         self.first_buffer_start_time = 0.0
         self.stream_buffer = ""
+        self._push_skip_mode = False
+        self._push_done = False
         self.last_stream_flush_time = time.time()
         
         with self._tts_lock:
@@ -804,31 +832,61 @@ class StreamRobot(Robot):
                 self._init_stream_connection()
             if self.current_tts_stream is None:
                 return
-        
+
         if self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
             self._check_and_reconnect_stream()
             self.stream_buffer += content
             current_time = time.time()
-            
-            if self.is_first_buffer:
+
+            if self._push_done:
+                return
+            if self._push_skip_mode:
+                self._process_push_skip(current_time)
+            elif self.is_first_buffer:
                 self._process_first_buffer(current_time)
             else:
                 self._process_normal_buffer(current_time)
-    
+
+    def _process_push_skip(self, current_time: float) -> None:
+        marker = '"reply":"'
+        if marker in self.stream_buffer:
+            idx = self.stream_buffer.find(marker)
+            value_start = idx + len(marker)
+            value_part = self.stream_buffer[value_start:]
+            quote_end = value_part.find('"')
+            if quote_end >= 0:
+                reply_text = value_part[:quote_end]
+                self._push_skip_mode = False
+                self._push_done = True
+                self.is_first_buffer = False
+                self.stream_buffer = ""
+                if reply_text.strip():
+                    try:
+                        self.current_tts_stream.append_text(reply_text)
+                        logger.debug(f"PUSH_REPLY提取完成并送TTS: {reply_text[:30]}...")
+                    except Exception as e:
+                        logger.error(f"发送reply内容到TTS失败: {e}")
+                return
+        if current_time - self.first_buffer_start_time >= self.first_buffer_duration * 3:
+            logger.warning("PUSH_REPLY等待超时，fallback到原始文本")
+            self._push_skip_mode = False
+            self.is_first_buffer = False
+            self._send_buffer_content(is_first=True)
+
     def _process_first_buffer(self, current_time: float) -> None:
-        """处理首次缓冲：超长等待并过滤特殊token"""
+        if self.PUSH_TOKEN in self.stream_buffer:
+            self._push_skip_mode = True
+            logger.debug(f"检测到PUSH标记，进入reply等待模式")
+            return
         if self.first_buffer_start_time == 0:
             self.first_buffer_start_time = current_time
             logger.debug(f"首次缓冲开始，等待{self.first_buffer_duration}秒检查特殊token")
-        
-        # 首次缓冲必须等待足够时间
         if current_time - self.first_buffer_start_time >= self.first_buffer_duration:
             self._send_buffer_content(is_first=True)
             self.is_first_buffer = False
-    
+
     def _process_normal_buffer(self, current_time: float) -> None:
-        """处理普通缓冲：时间或字数触发"""
-        if (current_time - self.last_stream_flush_time >= self.stream_buffer_duration 
+        if (current_time - self.last_stream_flush_time >= self.stream_buffer_duration
             or len(self.stream_buffer) >= 5):
             self._send_buffer_content(is_first=False)
     
@@ -850,10 +908,8 @@ class StreamRobot(Robot):
         self.last_stream_flush_time = time.time()
     
     def _filter_special_tokens(self, content: str) -> str:
-        """过滤特殊token"""
         filtered = content.replace(self.EXIT_TOKEN, "")
         filtered = filtered.replace(self.SWITCH_LISTEN_TOKEN, "")
-        filtered = filtered.replace(self.PUSH_TOKEN, "")
         filtered = re.sub(
             r'(?:标题[：:].*?(?=时间[：:]|地点[：:]|内容[：:]|好|请|已|收|记|$))'
             r'|(?:时间[：:].*?(?=地点[：:]|内容[：:]|好|请|已|收|记|$))'
@@ -920,6 +976,13 @@ class StreamRobot(Robot):
                     self.current_tts_stream = None
 
     def _chat_flush_tts(self) -> None:
+        if self._push_skip_mode or self._push_done:
+            self._push_skip_mode = False
+            self._push_done = False
+            self.is_first_buffer = False
+            logger.debug("PUSH模式下flush，丢弃剩余缓冲内容")
+            self.stream_buffer = ""
+            return
         if self.current_tts_stream is not None and self.tts_consecutive_fail_count < self.MAX_TTS_RETRY:
             if self.stream_buffer.strip():
                 filtered_content = self._filter_special_tokens(self.stream_buffer)

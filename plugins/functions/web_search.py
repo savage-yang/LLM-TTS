@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import random
@@ -7,11 +6,12 @@ import warnings
 
 import requests
 from bs4 import BeautifulSoup
-from cachetools import TTLCache
 from duckduckgo_search import DDGS
 
 from plugins.registry import register_function, ToolType
 from plugins.registry import ActionResponse, Action
+
+logger = logging.getLogger(__name__)
 
 class BaseSearch:
 
@@ -127,7 +127,7 @@ def web_search(query, engine="baidu"):
     else:  # 默认为 Google
         params = {"q": query}
         url = 'https://www.google.com/search'
-    print(url)
+    logger.debug(f"搜索URL: {url}")
     # 发送 GET 请求
     response = requests.get(url, params=params, headers=headers)
 

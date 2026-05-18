@@ -1,8 +1,6 @@
 from enum import Enum
 import logging
 
-# 初始化日志
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 初始化函数注册字典

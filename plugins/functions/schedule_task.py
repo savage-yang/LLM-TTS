@@ -46,8 +46,13 @@ class TaskScheduler:
 
 
 scheduler = TaskScheduler()
-scheduler_thread = threading.Thread(target=scheduler.run_scheduler)
-scheduler_thread.start()
+scheduler_thread = None
+
+def _ensure_scheduler_running():
+    global scheduler_thread
+    if scheduler_thread is None or not scheduler_thread.is_alive():
+        scheduler_thread = threading.Thread(target=scheduler.run_scheduler, daemon=True)
+        scheduler_thread.start()
 
 
 @register_function('schedule_task', action=ToolType.SCHEDULER)
@@ -59,7 +64,8 @@ def schedule_task(time_str, content):
         time_str (str): 任务的执行时间，格式为 'HH:mm'，比如 '08:00'。
         content (str): 任务的内容，比如 '提醒我喝水'。
     """
-    scheduler.schedule_task(content, time_str, content)
+    _ensure_scheduler_running()
+    scheduler.schedule_task(f"task_{hash(content) % 10000}", time_str, content)
     return ActionResponse(Action.RESPONSE, None, "好的，已帮您创建好定时提醒任务，时间到了我会提醒您哦")
 
 # 示例：使用 TaskScheduler 创建和管理任务

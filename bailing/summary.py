@@ -63,9 +63,7 @@ class SummaryManager:
         with self._items_lock:
             if not self.listening_items:
                 return ""
-            raw_text = ""
-            for item in self.listening_items:
-                raw_text += f"[{item['timestamp']}] {item['text']}\n"
+            raw_text = "\n".join(f"[{item['timestamp']}] {item['text']}" for item in self.listening_items) + "\n" if self.listening_items else ""
             return raw_text
 
     def add_summary(self, summary_text: str) -> None:

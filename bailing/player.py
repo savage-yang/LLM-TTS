@@ -1,7 +1,6 @@
 import logging
 import platform
 import queue
-import subprocess
 import threading
 import wave
 import random

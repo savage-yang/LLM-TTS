@@ -1,7 +1,11 @@
+import logging
+import os
+import requests
+
 from plugins.registry import register_function, ToolType
 from plugins.registry import ActionResponse, Action
-import requests
-import os
+
+logger = logging.getLogger(__name__)
 
 url = "http://127.0.0.1:18789/v1/chat/completions"
 OPENCLAW_AUTH = os.getenv("OPENCLAW_AUTH")
@@ -27,7 +31,7 @@ def openclaw_solver(query: str) -> str:
     try:
         resp = requests.post(OPENCLAW_URL, headers=headers, json=payload, timeout=60000)
         data = resp.json()
-        print(data)
+        logger.debug(f"aigc响应: {data}")
         return data["choices"][0]["message"]["content"]
     except Exception as e:
         return f"[aigc调用失败]: {str(e)}"

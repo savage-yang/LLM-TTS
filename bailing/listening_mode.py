@@ -137,13 +137,17 @@ class ListeningModeManager:
             return text, False
 
     def _summary_timer_loop(self):
-        """后台定时器循环，独立于ASR输入定期检查总结条件"""
+        """后台定时器循环，独立于ASR输入定期检查总结条件和对话空闲超时"""
         while not self._stop_event.is_set():
             self._stop_event.wait(5)
             with self._lock:
-                if self.mode != "listening":
-                    continue
-                self._check_trigger_summary_locked()
+                if self.mode == "listening":
+                    self._check_trigger_summary_locked()
+                elif self.mode == "dialogue":
+                    current_time = time.time()
+                    if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
+                        logger.info(f"对话模式空闲超过{self.dialogue_idle_timeout}秒，自动切回监听模式")
+                        self.mode = "listening"
 
     def _check_trigger_summary_locked(self):
         """检查是否满足触发总结的条件（定时或定量）"""
@@ -171,8 +175,8 @@ class ListeningModeManager:
         """
         raw_text = self.summary_manager.get_raw_text()
         if not raw_text:
-            # 已在持有锁的上下文中调用，无需再次获取锁
             self._summarizing = False
+            self.last_summary_time = time.time()
             return
 
         def do_summary():

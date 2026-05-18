@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 import re
-import subprocess
 import time
 import uuid
 import threading
@@ -10,9 +9,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from datetime import datetime
 from typing import Dict, Any, Optional
 import torch
-import torchaudio
 import soundfile as sf
-from kokoro import KModel, KPipeline
 import base64
 import dashscope
 from dashscope.audio.qwen_tts_realtime import QwenTtsRealtime, QwenTtsRealtimeCallback, AudioFormat
