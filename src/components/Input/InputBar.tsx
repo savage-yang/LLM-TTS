@@ -13,6 +13,7 @@ interface InputBarProps {
   currentMode: "listening" | "dialogue"
   isProcessing: boolean
   isSummarizing: boolean
+  isMicListening?: boolean
 }
 
 export function InputBar({
@@ -25,10 +26,10 @@ export function InputBar({
   currentMode,
   isProcessing,
   isSummarizing,
+  isMicListening = false,
 }: InputBarProps) {
   const [input, setInput] = useState("")
-  const { mode: storeMode } = useChatStore()
-  const mode = storeMode
+  const { mode } = useChatStore.getState()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,6 +80,33 @@ export function InputBar({
             {isConnected ? <Wifi size={15} /> : <WifiOff size={15} />}
           </button>
 
+          {/* 持续监听状态指示 */}
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] transition-all duration-300 ${
+            isMicListening
+              ? "border-emerald-400/20 text-emerald-400/50 bg-emerald-400/[0.04]"
+              : "border-white/[0.06] text-white/20 bg-white/[0.02]"
+          }`}>
+            <motion.div
+              className="w-1.5 h-1.5 rounded-full"
+              animate={
+                isMicListening
+                  ? { scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }
+                  : { scale: [1] }
+              }
+              transition={{
+                duration: isMicListening ? 1.2 : 0,
+                repeat: isMicListening ? Infinity : 0,
+                ease: "easeInOut",
+              }}
+              style={{
+                backgroundColor: isMicListening
+                  ? "rgba(52, 211, 153, 0.7)"
+                  : "rgba(255,255,255,0.15)",
+              }}
+            />
+            <span>{isMicListening ? "🎤 监听中" : "麦克风"}</span>
+          </div>
+
           <button
             type="button"
             onClick={handleModeToggle}
@@ -107,7 +135,9 @@ export function InputBar({
                   : isProcessing
                   ? "AI 正在思考..."
                   : mode === "listening"
-                  ? "说「小爱」唤醒我，或直接打字..."
+                  ? isMicListening
+                    ? "正在聆听，说「小爱」唤醒我..."
+                    : "等待麦克风权限..."
                   : isConnected
                   ? "说点什么..."
                   : "等待连接"
@@ -119,7 +149,11 @@ export function InputBar({
                 focus:border-white/12 focus:bg-white/[0.06]
                 transition-all duration-300
                 disabled:opacity-30 disabled:cursor-not-allowed
-                ${mode === "listening" ? "border-blue-400/[0.08]" : "border-white/[0.06]"}`}
+                ${isMicListening && mode === "listening"
+                  ? "border-emerald-400/[0.08]" 
+                  : mode === "listening" 
+                    ? "border-blue-400/[0.08]" 
+                    : "border-white/[0.06]"}`}
             />
           </div>
 

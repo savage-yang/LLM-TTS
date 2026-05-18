@@ -23,9 +23,21 @@ export interface CharacterState {
   isMouthOpen: boolean
 }
 
+export type ServerMessageType =
+  | "message"
+  | "connected"
+  | "mode_change"
+  | "listening_recorded"
+  | "summary_start"
+  | "summary"
+  | "status"
+  | "tts_start"
+  | "tts_audio_chunk"
+  | "tts_end"
+  | "tts_error"
+
 export interface ServerMessage {
-  type: "message" | "connected" | "mode_change" | "listening_recorded"
-    | "summary_start" | "summary" | "status"
+  type: ServerMessageType
   role?: MessageRole
   content: string
   is_final?: boolean
@@ -38,6 +50,12 @@ export interface ServerMessage {
   text?: string
   timestamp?: string
   status?: string
+  tts_enabled?: boolean
+  chunk_id?: number
+  total_chunks?: number
+  data?: string
+  is_last?: boolean
+  error?: string
 }
 
 export interface ClientMessage {

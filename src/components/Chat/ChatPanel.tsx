@@ -11,13 +11,13 @@ function ListeningEmpty() {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center pt-6 pb-4 gap-2"
+      className="flex flex-col items-center justify-center pt-10 pb-8 gap-4"
     >
-      <div className="w-10 h-10 rounded-full bg-blue-400/5 flex items-center justify-center mb-1">
-        <Sparkles size={18} className="text-blue-400/30" />
+      <div className="w-16 h-16 rounded-full bg-blue-400/[0.09] flex items-center justify-center mb-1">
+        <Sparkles size={28} className="text-blue-300/40" />
       </div>
-      <p className="text-white/15 text-sm">监听模式已开启</p>
-      <p className="text-white/8 text-[11px]">
+      <p className="text-lg text-white/30 font-medium">监听模式已开启</p>
+      <p className="text-base text-white/15">
         说「{wakeWord}」即可唤醒我
       </p>
     </motion.div>
@@ -33,18 +33,18 @@ function SummaryCard({ content, timestamp }: { content: string; timestamp: strin
     <motion.div
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="bg-blue-400/[0.03] border border-blue-400/[0.06] rounded-xl px-3.5 py-3 mb-2"
+      className="bg-blue-400/[0.06] border border-blue-400/[0.10] rounded-xl px-5 py-4 mb-4"
     >
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <div className="w-1 h-1 rounded-full bg-blue-400/50" />
-        <span className="text-[10px] text-white/20">监听总结</span>
-        <span className="text-[10px] text-white/10 ml-auto">{timestamp}</span>
+      <div className="flex items-center gap-2.5 mb-2.5">
+        <div className="w-2 h-2 rounded-full bg-blue-400/60" />
+        <span className="text-sm text-white/30 font-medium">监听总结</span>
+        <span className="text-sm text-white/14 ml-auto">{timestamp}</span>
       </div>
-      <p className="text-[12px] text-white/45 leading-relaxed whitespace-pre-wrap">{display}</p>
+      <p className="text-[17px] text-white/55 leading-relaxed whitespace-pre-wrap font-normal">{display}</p>
       {isLong && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-[10px] text-blue-400/40 hover:text-blue-400/60 mt-1 transition-colors"
+          className="text-sm text-blue-300/55 hover:text-blue-300/75 mt-2 transition-colors font-medium"
         >
           {expanded ? "收起" : "展开全文"}
         </button>
@@ -55,8 +55,8 @@ function SummaryCard({ content, timestamp }: { content: string; timestamp: strin
 
 function ChatEmpty() {
   return (
-    <div className="flex flex-col items-center justify-center pt-8 pb-4">
-      <p className="text-white/15 text-sm">开始对话</p>
+    <div className="flex flex-col items-center justify-center pt-12 pb-8">
+      <p className="text-lg text-white/30 font-medium">开始对话</p>
     </div>
   )
 }
@@ -66,19 +66,19 @@ function SummarizingIndicator() {
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2 px-3.5 py-2.5 bg-white/[0.02] border border-white/[0.04] rounded-xl mb-2"
+      className="flex items-center gap-3 px-5 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-xl mb-4"
     >
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         {[0, 1, 2].map((i) => (
           <motion.div
             key={i}
-            className="w-1 h-1 rounded-full bg-blue-400/40"
+            className="w-2 h-2 rounded-full bg-blue-400/50"
             animate={{ opacity: [0.2, 0.6, 0.2] }}
             transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }}
           />
         ))}
       </div>
-      <span className="text-[11px] text-white/20">正在生成监听总结...</span>
+      <span className="text-base text-white/30 font-medium">正在生成监听总结...</span>
     </motion.div>
   )
 }
@@ -92,7 +92,7 @@ export function ChatPanel() {
   }, [messages, isProcessing])
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3">
+    <div className="flex-1 overflow-y-auto px-6 py-5">
       <div className="max-w-lg mx-auto">
         {mode === "listening" ? (
           <>
@@ -108,15 +108,15 @@ export function ChatPanel() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="mt-3"
+                className="mt-5"
               >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-1 h-1 rounded-full bg-emerald-400/50 animate-pulse" />
-                  <span className="text-[10px] text-white/15">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400/60 animate-pulse" />
+                  <span className="text-sm text-white/28 font-medium">
                     已监听 {wordCount} 字
                   </span>
                 </div>
-                <p className="text-[11px] text-white/20 truncate">
+                <p className="text-base text-white/25 truncate">
                   最近: {lastRecordedText}
                 </p>
               </motion.div>

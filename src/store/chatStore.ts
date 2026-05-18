@@ -9,6 +9,7 @@ interface ChatStore {
   isConnected: boolean
   isProcessing: boolean
   isSummarizing: boolean
+  isTtsSpeaking: boolean
   wsUrl: string
   wakeWord: string
   wordCount: number
@@ -26,6 +27,7 @@ interface ChatStore {
   setLastRecordedText: (text: string) => void
   addSummary: (summary: SummaryItem) => void
   setSummarizing: (v: boolean) => void
+  setTtsSpeaking: (v: boolean) => void
   setWsUrl: (url: string) => void
   resetMessages: () => void
 }
@@ -38,6 +40,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   isConnected: false,
   isProcessing: false,
   isSummarizing: false,
+  isTtsSpeaking: false,
   wsUrl: "ws://localhost:8765/ws",
   wakeWord: "小爱",
   wordCount: 0,
@@ -75,6 +78,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   addSummary: (summary) =>
     set((state) => ({ summaries: [summary, ...state.summaries] })),
   setSummarizing: (v) => set({ isSummarizing: v }),
+  setTtsSpeaking: (v) => set({ isTtsSpeaking: v }),
   setWsUrl: (url) => set({ wsUrl: url }),
   resetMessages: () => set({ messages: [] }),
 }))

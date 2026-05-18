@@ -26,7 +26,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/45 backdrop-blur-sm z-40"
             onClick={onClose}
           />
           <motion.div
@@ -36,18 +36,18 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
               w-full max-w-xs z-50
-              bg-[#0d1220]/90 backdrop-blur-xl border border-white/[0.06] 
-              rounded-2xl p-5 shadow-2xl"
+              bg-[#1e2840]/97 backdrop-blur-xl border border-white/[0.12] 
+              rounded-2xl p-7 shadow-2xl"
           >
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[13px] font-medium text-white/60 tracking-wide">
+            <div className="flex items-center justify-between mb-7">
+              <h2 className="text-lg font-semibold text-white/70 tracking-wide">
                 连接设置
               </h2>
               <button
                 onClick={onClose}
-                className="p-1 rounded-lg text-white/30 hover:text-white/50 hover:bg-white/[0.05] transition-colors"
+                className="p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/[0.07] transition-colors"
               >
-                <X size={14} />
+                <X size={18} />
               </button>
             </div>
 
@@ -56,16 +56,16 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="ws://localhost:8765"
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 
-                text-[13px] text-white/80 placeholder-white/20 outline-none
-                focus:border-white/15 focus:bg-white/[0.06]
-                transition-all duration-300 mb-4"
+              className="w-full bg-white/[0.06] border border-white/[0.13] rounded-xl px-4 py-3.5 
+                text-[16px] text-white/90 placeholder-white/28 outline-none
+                focus:border-white/20 focus:bg-white/[0.08]
+                transition-all duration-300 mb-6"
             />
 
             <button
               onClick={handleSave}
-              className="w-full py-2.5 rounded-xl bg-white/[0.07] border border-white/[0.08] text-white/70 
-                hover:bg-white/[0.10] hover:text-white/85 text-[13px]
+              className="w-full py-3.5 rounded-xl bg-white/[0.09] border border-white/[0.13] text-white/85 
+                hover:bg-white/[0.13] hover:text-white/95 text-[16px] font-semibold
                 transition-all duration-200"
             >
               保存

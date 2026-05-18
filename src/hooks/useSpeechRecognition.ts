@@ -1,68 +1,115 @@
 import { useState, useRef, useCallback } from "react"
 
-interface UseSpeechRecognitionProps {
-  onResult: (text: string) => void
-  language?: string
+interface UseMicRecorderProps {
+  wsRef: React.RefObject<WebSocket | null>
+  isConnected: boolean
 }
 
-export function useSpeechRecognition({
-  onResult,
-  language = "zh-CN",
-}: UseSpeechRecognitionProps) {
-  const [isListening, setIsListening] = useState(false)
-  const recognitionRef = useRef<any>(null)
+export function useSpeechRecognition({ wsRef, isConnected }: UseMicRecorderProps) {
+  const [isRecording, setIsRecording] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const manuallyActivatedRef = useRef(false)
 
   const isSupported = typeof window !== "undefined" && 
-    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
+    !!navigator.mediaDevices && !!navigator.mediaDevices.getUserMedia
 
-  const startListening = useCallback(() => {
-    if (!isSupported) {
-      console.warn("Speech recognition not supported")
-      return
-    }
+  const startRecording = useCallback(async () => {
+    if (!isSupported || !isConnected) return
 
-    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    const recognition = new SpeechRecognitionAPI()
+    try {
+      stopRecording()
 
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.lang = language
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      })
 
-    recognition.onstart = () => {
-      setIsListening(true)
-    }
+      streamRef.current = stream
+      manuallyActivatedRef.current = true
 
-    recognition.onend = () => {
-      setIsListening(false)
-    }
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript
-      if (transcript.trim()) {
-        onResult(transcript)
+      let mimeType = ""
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        mimeType = "audio/webm;codecs=opus"
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = "audio/webm"
+      } else {
+        mimeType = ""
       }
-    }
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error)
-      setIsListening(false)
-    }
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mimeType || undefined,
+      })
 
-    recognitionRef.current = recognition
-    recognition.start()
-  }, [isSupported, language, onResult])
+      recorder.onstart = () => {
+        setIsRecording(true)
+      }
 
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      setIsListening(false)
+      recorder.onstop = () => {
+        setIsRecording(false)
+        if (manuallyActivatedRef.current && streamRef.current && streamRef.current.active) {
+          setTimeout(() => {
+            try {
+              if (recorder.state === "inactive") {
+                recorder.start(200)
+              }
+            } catch {}
+          }, 300)
+        }
+      }
+
+      recorder.onerror = (event) => {
+        console.error("MediaRecorder error:", event.error)
+        setIsRecording(false)
+      }
+
+      recorder.ondataavailable = (event) => {
+        if (!event.data || event.data.size === 0) return
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+
+        event.data.arrayBuffer().then((arrayBuffer) => {
+          try {
+            wsRef.current.send(arrayBuffer)
+          } catch (e) {
+            console.warn("Send audio chunk failed:", e)
+          }
+        })
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start(200)
+
+    } catch (e) {
+      console.error("Failed to start recording:", e)
+      setIsRecording(false)
     }
+  }, [isSupported, isConnected])
+
+  const stopRecording = useCallback(() => {
+    manuallyActivatedRef.current = false
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop()
+        }
+      } catch {}
+      mediaRecorderRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    setIsRecording(false)
   }, [])
 
   return {
     isSupported,
-    isListening,
-    startListening,
-    stopListening,
+    isRecording,
+    startRecording,
+    stopRecording,
   }
 }

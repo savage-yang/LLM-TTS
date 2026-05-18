@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef } from "react"
 import { useChatStore } from "@/store/chatStore"
 import type { ServerMessage } from "@/types"
 
-export function useWebSocket() {
+interface UseWebSocketOptions {
+  onTtsChunk?: (data: string, isLast: boolean) => void
+  onTtsStart?: () => void
+  onTtsEnd?: () => void
+}
+
+export function useWebSocket(options?: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>()
   const {
@@ -20,6 +26,7 @@ export function useWebSocket() {
     setLastRecordedText,
     addSummary,
     setSummarizing,
+    setTtsSpeaking,
   } = useChatStore()
 
   const connect = useCallback(() => {
@@ -84,6 +91,32 @@ export function useWebSocket() {
               setSummarizing(false)
               break
 
+            case "tts_start":
+              setTtsSpeaking(true)
+              setCharacterEmotion("speaking")
+              options?.onTtsStart?.()
+              break
+
+            case "tts_audio_chunk":
+              if (data.data && data.is_last !== undefined) {
+                options?.onTtsChunk?.(data.data, data.is_last)
+              }
+              break
+
+            case "tts_end":
+              setTtsSpeaking(false)
+              setMouthOpen(false)
+              setCharacterEmotion("happy")
+              options?.onTtsEnd?.()
+              break
+
+            case "tts_error":
+              setTtsSpeaking(false)
+              setMouthOpen(false)
+              setCharacterEmotion("idle")
+              console.error("TTS error:", data.error)
+              break
+
             case "message": {
               const msg = data as ServerMessage
               if (msg.role === "user") {
@@ -101,9 +134,12 @@ export function useWebSocket() {
               if (msg.is_final) {
                 setProcessing(false)
                 setMouthOpen(false)
+                if (msg.emotion) {
+                  setCharacterEmotion(msg.emotion)
+                }
                 const msgs = useChatStore.getState().messages
                 const lastMsg = msgs[msgs.length - 1]
-                if (lastMsg?.role === "assistant" && !msg.is_final) {
+                if (lastMsg?.role === "assistant") {
                   updateLastAssistantMessage(msg.content)
                 } else {
                   addMessage({
@@ -154,7 +190,7 @@ export function useWebSocket() {
     } catch {
       reconnectTimer.current = setTimeout(connect, 3000)
     }
-  }, [wsUrl, setConnected, addMessage, updateLastAssistantMessage, setCharacterEmotion, setProcessing, setMouthOpen, setMode, setWakeWord, setWordCount, setLastRecordedText, addSummary, setSummarizing])
+  }, [wsUrl, setConnected, addMessage, updateLastAssistantMessage, setCharacterEmotion, setProcessing, setMouthOpen, setMode, setWakeWord, setWordCount, setLastRecordedText, addSummary, setSummarizing, setTtsSpeaking, options])
 
   const disconnect = useCallback(() => {
     if (reconnectTimer.current) {
@@ -192,5 +228,5 @@ export function useWebSocket() {
     }
   }, [])
 
-  return { connect, disconnect, sendMessage, switchMode, isConnected }
+  return { connect, disconnect, sendMessage, switchMode, isConnected, wsRef }
 }
