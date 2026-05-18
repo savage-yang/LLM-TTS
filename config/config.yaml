@@ -105,7 +105,7 @@ ListeningMode:
   enabled: true
   summary_interval: 60 # 自动总结间隔（秒），默认1分钟
   summary_word_threshold: 300 # 自动总结字数阈值
-  dialogue_idle_timeout: 90 # 对话模式空闲超时（秒），超时自动切回监听模式
+  dialogue_idle_timeout: 150 # 对话模式空闲超时（秒），超时自动切回监听模式
   summary_save_path: "./tmp/listening_summaries"
 
 # Bark推送配置（iOS推送服务，下载App后填入你的设备Key即可）

@@ -854,7 +854,13 @@ class StreamRobot(Robot):
         filtered = content.replace(self.EXIT_TOKEN, "")
         filtered = filtered.replace(self.SWITCH_LISTEN_TOKEN, "")
         filtered = filtered.replace(self.PUSH_TOKEN, "")
-        filtered = re.sub(r'(?:标题|时间|地点|内容)[：:][^好请行]*?(?=好|请|$)', '', filtered)
+        filtered = re.sub(
+            r'(?:标题[：:].*?(?=时间[：:]|地点[：:]|内容[：:]|好|请|已|收|记|$))'
+            r'|(?:时间[：:].*?(?=地点[：:]|内容[：:]|好|请|已|收|记|$))'
+            r'|(?:地点[：:].*?(?=内容[：:]|好|请|已|收|记|$))'
+            r'|(?:内容[：:].*?(?=好|请|已|收|记|$))',
+            '', filtered, flags=re.DOTALL
+        )
         if not self.start_task_mode:
             filtered = re.sub(r'```json.*?```', '', filtered, flags=re.DOTALL)
             filtered = re.sub(r'\{\"function_name\".*?\}', '', filtered, flags=re.DOTALL)
@@ -941,7 +947,13 @@ class StreamRobot(Robot):
             self.pending_shutdown = True
 
     def _do_push_notification(self, content: str) -> None:
-        self.bark_notifier.send_formatted(content)
+        if self.bark_notifier is None:
+            logger.warning("Bark推送器未初始化，跳过推送")
+            return
+        try:
+            self.bark_notifier.send_formatted(content)
+        except Exception as e:
+            logger.error(f"Bark推送异常: {e}")
 
     def _chat_tool_token(self, content: str) -> None:
         with self._tts_lock:

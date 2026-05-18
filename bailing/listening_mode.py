@@ -188,11 +188,12 @@ class ListeningModeManager:
 
                 if self.PUSH_TOKEN in final_summary:
                     push_content = final_summary.replace(self.PUSH_TOKEN, "").strip()
-                    if self.bark_notifier:
+                    if push_content and self.bark_notifier:
                         self.bark_notifier.send_formatted(push_content)
                     final_summary = push_content
 
-                self.summary_manager.add_summary(final_summary)
+                if final_summary:
+                    self.summary_manager.add_summary(final_summary)
                 with self._lock:
                     self.total_word_count = 0
                     self.last_summary_time = time.time()
