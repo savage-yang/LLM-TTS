@@ -50,7 +50,7 @@ LLM:
 TTS:
   Qwen3TTS:
     model_path: D:\bailing-main\Qwen3-TTS-12Hz-0.6B-Base
-    ref_audio: D:\bailing-main\voice_design_reference.wav
+    ref_audio: D:\bailing-main\voice_cache\voice_design_reference.wav
     ref_text: 你好我是你的私人秘书请问有什么可以帮助到你的吗？
     language: Chinese
     output_dir: tmp/
