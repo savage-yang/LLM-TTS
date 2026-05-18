@@ -117,7 +117,7 @@ class Robot(ABC):
         self.vad_start = True
 
         self.INTERRUPT = config["interrupt"]
-        self.silence_time_ms = int((1000 / 1000) * (16000 / 512))
+        self.silence_time_ms = 31  # (1000/1000)*(16000/512) = 每帧31ms
 
         self.last_voice_time = time.time() * 1000
         self.max_silence_before_speech = config.get("VAD", {}).get("max_silence_before_speech", 2000)
@@ -318,12 +318,14 @@ class Robot(ABC):
 
     def _async_asr_process(self, voice_data):
         """后台线程：ASR 识别 + 文本处理"""
+        t_asr_call = time.time()
         try:
             text, tmpfile = self.asr.recognizer(voice_data)
         except Exception as e:
             logger.error(f"ASR识别出错: {e}")
             return
 
+        t_asr_done = time.time()
         if not text.strip():
             logger.debug("识别结果为空，跳过处理。")
             return
@@ -342,6 +344,8 @@ class Robot(ABC):
         processed_text, is_wake_transition = self.listening_manager.process_asr_result(text, start_time, end_time)
 
         if processed_text is not None and processed_text.strip():
+            asr_real = (t_asr_done - t_asr_call) * 1000
+            logger.info(f"[耗时] ASR识别完成: {processed_text[:20]}... | ASR耗时: {asr_real:.0f}ms")
             logger.debug(f"ASR识别结果(对话模式): {processed_text}")
             if self.chat_lock:
                 logger.debug("对话模式已有对话进行中，忽略本次ASR结果")
@@ -351,17 +355,6 @@ class Robot(ABC):
             self._submit_chat(processed_text, play_wakeup=is_wake_transition)
         else:
             logger.debug(f"ASR识别结果(监听模式): {text}")
-
-    def _play_wakeup_sound(self) -> None:
-        root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        wakeup_path = os.path.join(root_path, "voice_cache", "wakeup.wav")
-        if os.path.exists(wakeup_path):
-            logger.debug("播放唤醒音效")
-            self.player.play(wakeup_path)
-            while self.player.get_playing_status():
-                time.sleep(0.05)
-        else:
-            logger.debug(f"唤醒音效文件不存在：{wakeup_path}")
 
     def _duplex(self) -> None:
         data = self.vad_queue.get()
@@ -544,6 +537,7 @@ class Robot(ABC):
         return response_message
 
     def chat(self, query: str, play_wakeup: bool = False) -> Optional[bool]:
+        t_chat_start = time.time()
         self.dialogue.put(Message(role="user", content=query))
         self.chat_lock = True
 
@@ -554,8 +548,25 @@ class Robot(ABC):
 
         if play_wakeup:
             self._wakeup_playing = True
-            self._play_wakeup_sound()
+            root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            wakeup_path = os.path.join(root_path, "voice_cache", "wakeup.wav")
+            buffer_finish_event.clear()
             buffer_played = True
+            if os.path.exists(wakeup_path):
+                def _play_wakeup():
+                    try:
+                        self.player.play(wakeup_path)
+                        while self.player.get_playing_status():
+                            time.sleep(0.05)
+                    except Exception as e:
+                        logger.warning(f"唤醒音效播放失败：{e}")
+                    finally:
+                        buffer_finish_event.set()
+                        self._wakeup_playing = False
+                self._executor_for_prologue().submit(_play_wakeup)
+                logger.debug("唤醒音效已异步提交")
+            else:
+                buffer_finish_event.set()
         else:
             query_length = len(query.strip())
             threshold = self.buffer_sound_config.get("threshold_length", 15)
@@ -567,19 +578,24 @@ class Robot(ABC):
                 if buffer_played:
                     logger.debug(f"问题长度{query_length}≥阈值{threshold}，已触发缓冲音效")
 
+        self._buffer_finish_event = buffer_finish_event
+        self._buffer_played = buffer_played
+
         self._chat_reset_tts()
 
         response_message = []
         need_exit = False
         need_switch_listen = False
         need_push = False
+        t_first_token = None
 
         if self.start_task_mode:
             response_message = self.chat_tool(query)
         else:
-            self._wakeup_playing = False
             try:
                 llm_responses = self.llm.response(self.dialogue.get_llm_dialogue())
+                t_llm_start = time.time()
+                logger.info(f"[耗时] LLM请求已发出 | 距chat入口: {(t_llm_start - t_chat_start)*1000:.0f}ms")
             except Exception as e:
                 self.chat_lock = False
                 logger.error(f"LLM 处理出错 {query}: {e}")
@@ -593,12 +609,19 @@ class Robot(ABC):
                 content = re.sub(r'\{\"function_name\".*?\}', '', content, flags=re.DOTALL)
                 if not content.strip():
                     continue
+                if t_first_token is None:
+                    t_first_token = time.time()
+                    logger.info(f"[耗时] LLM首token到达 | LLM耗时: {(t_first_token - t_llm_start)*1000:.0f}ms | 距chat入口: {(t_first_token - t_chat_start)*1000:.0f}ms")
                 response_message.append(content)
                 logger.debug(f"收到LLM token: {content}")
                 self._chat_handle_token(content)
 
         self._chat_flush_tts()
 
+        t_llm_done = time.time()
+        if t_first_token:
+            total_ms = (t_llm_done - t_chat_start) * 1000
+            logger.info(f"[耗时] LLM全部token接收完成 | 总token数: {len(response_message)} | LLM总耗时: {(t_llm_done - t_llm_start)*1000:.0f}ms | 全链路: {total_ms:.0f}ms")
         raw_full_response = "".join(response_message).strip()
         logger.info(f"[LLM原始回答] {raw_full_response}")
         full_response = raw_full_response.replace(self.EXIT_TOKEN, "").strip()
@@ -667,14 +690,6 @@ class Robot(ABC):
 
             if self.callback:
                 self.callback({"role": "assistant", "content": full_response})
-
-            if buffer_played:
-                logger.debug("等待缓冲音效播放完成，准备输出TTS...")
-                buffer_finish_event.wait(timeout=1)
-                pause_time = self.buffer_sound_config.get("pause_after_buffer")
-                if pause_time > 0:
-                    logger.debug(f"缓冲音效结束，停顿{pause_time}秒后开始输出回答...")
-                    time.sleep(pause_time)
 
             self._chat_submit_tts(full_response, need_exit)
         else:
@@ -762,6 +777,7 @@ class StreamRobot(Robot):
         self._tts_lock = threading.RLock()  # 保护 current_tts_stream 的读写（可重入，避免同一线程重复申请死锁）
         
         self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
+        self._prologue_executor = ThreadPoolExecutor(max_workers=1)
         logger.info(f"已启用流式TTS模式，首次对话自动建连，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒，空闲超时: {self.idle_timeout}秒")
 
     def _tts_priority(self) -> None:
@@ -861,6 +877,11 @@ class StreamRobot(Robot):
                 self.is_first_buffer = False
                 self.stream_buffer = ""
                 if reply_text.strip():
+                    self._buffer_finish_event.wait()
+                    if self._buffer_played:
+                        pause_time = self.buffer_sound_config.get("pause_after_buffer", 0)
+                        if pause_time > 0:
+                            time.sleep(pause_time)
                     try:
                         self.current_tts_stream.append_text(reply_text)
                         logger.debug(f"PUSH_REPLY提取完成并送TTS: {reply_text[:30]}...")
@@ -892,6 +913,12 @@ class StreamRobot(Robot):
     
     def _send_buffer_content(self, is_first: bool = False) -> None:
         """过滤并发送缓冲池内容到TTS"""
+        if is_first:
+            self._buffer_finish_event.wait()
+            if self._buffer_played:
+                pause_time = self.buffer_sound_config.get("pause_after_buffer", 0)
+                if pause_time > 0:
+                    time.sleep(pause_time)
         filtered_content = self._filter_special_tokens(self.stream_buffer)
         
         if (filtered_content.strip() 
@@ -988,9 +1015,14 @@ class StreamRobot(Robot):
                 filtered_content = self._filter_special_tokens(self.stream_buffer)
                 if filtered_content.strip():
                     try:
-                        self.current_tts_stream.append_text(filtered_content)
                         if self.is_first_buffer:
+                            self._buffer_finish_event.wait()
+                            if self._buffer_played:
+                                pause_time = self.buffer_sound_config.get("pause_after_buffer", 0)
+                                if pause_time > 0:
+                                    time.sleep(pause_time)
                             logger.debug(f"首次缓冲提前刷新发送，过滤前:{len(self.stream_buffer)}字，过滤后:{len(filtered_content)}字")
+                        self.current_tts_stream.append_text(filtered_content)
                     except Exception as e:
                         logger.error(f"发送剩余缓冲内容到TTS失败: {e}")
             self.is_first_buffer = False
@@ -1000,7 +1032,8 @@ class StreamRobot(Robot):
             self.tts_consecutive_fail_count = 0
 
     def _chat_submit_tts(self, full_response: str, need_exit: bool) -> None:
-        logger.info(f"LLM回答生成完成，总长度{len(full_response)}字，已流式发送给TTS")
+        t_tts_submit = time.time()
+        logger.info(f"[耗时] TTS提交完成 | 回复长度: {len(full_response)}字")
         if self.current_tts_stream is not None:
             self.current_tts_stream.finish(timeout=60)
         else:
@@ -1054,7 +1087,7 @@ class StreamRobot(Robot):
         t.start()
 
     def _executor_for_prologue(self):
-        return None
+        return self._prologue_executor
 
 
 # ============================================================
