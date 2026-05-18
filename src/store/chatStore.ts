@@ -1,12 +1,18 @@
 import { create } from "zustand"
-import type { Message, EmotionType, CharacterState } from "@/types"
+import type { Message, EmotionType, CharacterState, AppMode, SummaryItem } from "@/types"
 
 interface ChatStore {
   messages: Message[]
+  summaries: SummaryItem[]
   characterState: CharacterState
+  mode: AppMode
   isConnected: boolean
   isProcessing: boolean
+  isSummarizing: boolean
   wsUrl: string
+  wakeWord: string
+  wordCount: number
+  lastRecordedText: string
 
   addMessage: (message: Message) => void
   updateLastAssistantMessage: (content: string) => void
@@ -14,16 +20,28 @@ interface ChatStore {
   setMouthOpen: (open: boolean) => void
   setConnected: (connected: boolean) => void
   setProcessing: (processing: boolean) => void
+  setMode: (mode: AppMode) => void
+  setWakeWord: (word: string) => void
+  setWordCount: (count: number) => void
+  setLastRecordedText: (text: string) => void
+  addSummary: (summary: SummaryItem) => void
+  setSummarizing: (v: boolean) => void
   setWsUrl: (url: string) => void
   resetMessages: () => void
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
   messages: [],
+  summaries: [],
   characterState: { emotion: "idle", isMouthOpen: false },
+  mode: "listening",
   isConnected: false,
   isProcessing: false,
-  wsUrl: "ws://localhost:8765",
+  isSummarizing: false,
+  wsUrl: "ws://localhost:8765/ws",
+  wakeWord: "小爱",
+  wordCount: 0,
+  lastRecordedText: "",
 
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -50,6 +68,13 @@ export const useChatStore = create<ChatStore>((set) => ({
 
   setConnected: (connected) => set({ isConnected: connected }),
   setProcessing: (processing) => set({ isProcessing: processing }),
+  setMode: (mode) => set({ mode }),
+  setWakeWord: (word) => set({ wakeWord: word }),
+  setWordCount: (count) => set({ wordCount: count }),
+  setLastRecordedText: (text) => set({ lastRecordedText: text }),
+  addSummary: (summary) =>
+    set((state) => ({ summaries: [summary, ...state.summaries] })),
+  setSummarizing: (v) => set({ isSummarizing: v }),
   setWsUrl: (url) => set({ wsUrl: url }),
   resetMessages: () => set({ messages: [] }),
 }))

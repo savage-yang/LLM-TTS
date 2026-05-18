@@ -1,23 +1,34 @@
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { motion } from "framer-motion"
 import { Send, Settings, Wifi, WifiOff } from "lucide-react"
+import { useChatStore } from "@/store/chatStore"
 
 interface InputBarProps {
   onSend: (content: string) => void
+  onSwitchMode: (mode: "listening" | "dialogue") => void
   onOpenSettings: () => void
   onConnect: () => void
   isConnected: boolean
   canConnect: boolean
+  currentMode: "listening" | "dialogue"
+  isProcessing: boolean
+  isSummarizing: boolean
 }
 
 export function InputBar({
   onSend,
+  onSwitchMode,
   onOpenSettings,
   onConnect,
   isConnected,
   canConnect,
+  currentMode,
+  isProcessing,
+  isSummarizing,
 }: InputBarProps) {
   const [input, setInput] = useState("")
+  const { mode: storeMode } = useChatStore()
+  const mode = storeMode
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,6 +37,24 @@ export function InputBar({
     onSend(trimmed)
     setInput("")
   }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit(e)
+    }
+  }
+
+  const handleModeToggle = () => {
+    if (!isConnected) return
+    if (mode === "listening") {
+      onSwitchMode("dialogue")
+    } else {
+      onSwitchMode("listening")
+    }
+  }
+
+  const isDisabled = !isConnected
 
   return (
     <motion.div
@@ -50,25 +79,53 @@ export function InputBar({
             {isConnected ? <Wifi size={15} /> : <WifiOff size={15} />}
           </button>
 
+          <button
+            type="button"
+            onClick={handleModeToggle}
+            disabled={isDisabled}
+            className={`p-1.5 px-3 rounded-full border text-[11px] transition-all duration-300
+              disabled:opacity-20 disabled:cursor-not-allowed
+              ${
+                mode === "listening"
+                  ? "border-blue-400/15 text-blue-400/50 hover:bg-blue-400/[0.04]"
+                  : "border-amber-400/15 text-amber-400/50 hover:bg-amber-400/[0.04]"
+              }`}
+            title={mode === "listening" ? "点击进入对话模式" : "点击切换监听模式"}
+          >
+            {mode === "listening" ? "🔊 监听" : "💬 对话"}
+          </button>
+
           <div className="flex-1 relative">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isConnected ? "说点什么..." : "等待连接"}
-              disabled={!isConnected}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isSummarizing
+                  ? "AI 正在总结监听内容..."
+                  : isProcessing
+                  ? "AI 正在思考..."
+                  : mode === "listening"
+                  ? "说「小爱」唤醒我，或直接打字..."
+                  : isConnected
+                  ? "说点什么..."
+                  : "等待连接"
+              }
+              disabled={isDisabled}
               autoFocus
-              className="w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl px-4 py-2.5 
+              className={`w-full bg-white/[0.04] border rounded-2xl px-4 py-2.5 
                 text-sm text-white/80 placeholder-white/20 outline-none
                 focus:border-white/12 focus:bg-white/[0.06]
                 transition-all duration-300
-                disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled:opacity-30 disabled:cursor-not-allowed
+                ${mode === "listening" ? "border-blue-400/[0.08]" : "border-white/[0.06]"}`}
             />
           </div>
 
           <button
             type="submit"
-            disabled={!input.trim() || !isConnected}
+            disabled={!input.trim() || isDisabled}
             className="p-2.5 rounded-full text-white/30 
               hover:text-white/50 hover:bg-white/[0.04]
               disabled:opacity-20 disabled:cursor-not-allowed

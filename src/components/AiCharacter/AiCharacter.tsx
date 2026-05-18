@@ -1,7 +1,7 @@
 import { useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useChatStore } from "@/store/chatStore"
-import type { EmotionType } from "@/types"
+import type { EmotionType, AppMode } from "@/types"
 
 const glowColor: Record<EmotionType, string> = {
   idle: "rgba(140, 180, 220, 0.12)",
@@ -11,12 +11,9 @@ const glowColor: Record<EmotionType, string> = {
   happy: "rgba(255, 160, 100, 0.16)",
 }
 
-const faceTilt: Record<EmotionType, number> = {
-  idle: 0,
-  listening: 6,
-  thinking: -4,
-  speaking: 2,
-  happy: 5,
+const modeGlowColor: Record<AppMode, string> = {
+  listening: "rgba(100, 180, 255, 0.10)",
+  dialogue: "rgba(255, 200, 80, 0.12)",
 }
 
 function Eye({ side, emotion }: { side: "left" | "right"; emotion: EmotionType }) {
@@ -104,13 +101,44 @@ function Mouth({ emotion, isOpen }: { emotion: EmotionType; isOpen: boolean }) {
   )
 }
 
+function ListeningEar({ active }: { active: boolean }) {
+  return (
+    <AnimatePresence>
+      {active && (
+        <>
+          <motion.g
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: [0.3, 0.6, 0.3], x: [-8, -4, -8] }}
+            exit={{ opacity: 0, x: -6 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <path d="M-8 -12 Q-16 -18 -14 -10" stroke="#60b8ff" strokeWidth={1.5} fill="none" opacity={0.5} />
+          </motion.g>
+          <motion.g
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: [0.3, 0.6, 0.3], x: [8, 4, 8] }}
+            exit={{ opacity: 0, x: 6 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
+          >
+            <path d="M8 -12 Q16 -18 14 -10" stroke="#60b8ff" strokeWidth={1.5} fill="none" opacity={0.5} />
+          </motion.g>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
 export function AiCharacter() {
-  const { characterState } = useChatStore()
+  const { characterState, mode } = useChatStore()
   const { emotion, isMouthOpen } = characterState
+  const ref = useRef(null)
+
+  const effectiveEmotion = mode === "listening" ? "listening" : emotion
 
   return (
     <div className="relative flex items-center justify-center select-none">
       <motion.div
+        ref={ref}
         className="relative"
         initial={{ opacity: 0, scale: 0.85, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -121,13 +149,27 @@ export function AiCharacter() {
           className="absolute inset-0 rounded-full"
           animate={{
             boxShadow: [
-              `0 0 40px ${glowColor[emotion]}, 0 0 80px ${glowColor[emotion]}`,
-              `0 0 60px ${glowColor[emotion]}, 0 0 110px ${glowColor[emotion]}`,
-              `0 0 40px ${glowColor[emotion]}, 0 0 80px ${glowColor[emotion]}`,
+              `0 0 40px ${glowColor[effectiveEmotion]}, 0 0 80px ${glowColor[effectiveEmotion]}`,
+              `0 0 60px ${glowColor[effectiveEmotion]}, 0 0 110px ${glowColor[effectiveEmotion]}`,
+              `0 0 40px ${glowColor[effectiveEmotion]}, 0 0 80px ${glowColor[effectiveEmotion]}`,
             ],
           }}
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           style={{ width: 180, height: 180, margin: -20 }}
+        />
+
+        {/* Mode glow ring */}
+        <motion.div
+          className="absolute rounded-full"
+          style={{ width: 160, height: 160, margin: -10 }}
+          animate={{
+            boxShadow: [
+              `0 0 20px ${modeGlowColor[mode]}`,
+              `0 0 40px ${modeGlowColor[mode]}`,
+              `0 0 20px ${modeGlowColor[mode]}`,
+            ],
+          }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         />
 
         {/* Floating animation */}
@@ -165,10 +207,7 @@ export function AiCharacter() {
             </defs>
 
             {/* Head circle */}
-            <g
-              transform={`rotate(${faceTilt[emotion]} 70 70)`}
-              style={{ transformOrigin: "70px 70px" }}
-            >
+            <g>
               <motion.circle
                 cx={70}
                 cy={70}
@@ -177,8 +216,8 @@ export function AiCharacter() {
                 initial={false}
                 animate={{
                   scaleX:
-                    emotion === "listening" ? 1.02 :
-                    emotion === "happy" ? 0.98 :
+                    effectiveEmotion === "listening" ? 1.02 :
+                    effectiveEmotion === "happy" ? 0.98 :
                     1,
                 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
@@ -187,13 +226,13 @@ export function AiCharacter() {
 
               {/* Eyes */}
               <g transform="translate(70, 60)">
-                <Eye side="left" emotion={emotion} />
-                <Eye side="right" emotion={emotion} />
+                <Eye side="left" emotion={effectiveEmotion} />
+                <Eye side="right" emotion={effectiveEmotion} />
               </g>
 
               {/* Blush (subtle) */}
               <AnimatePresence>
-                {(emotion === "happy" || emotion === "speaking") && (
+                {(effectiveEmotion === "happy" || effectiveEmotion === "speaking") && (
                   <motion.g
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 0.25 }}
@@ -208,15 +247,18 @@ export function AiCharacter() {
 
               {/* Mouth */}
               <g transform="translate(70, 82)">
-                <Mouth emotion={emotion} isOpen={isMouthOpen} />
+                <Mouth emotion={effectiveEmotion} isOpen={isMouthOpen} />
               </g>
+
+              {/* Listening ear indicators */}
+              <ListeningEar active={mode === "listening" && effectiveEmotion === "listening"} />
             </g>
           </svg>
         </motion.div>
 
         {/* Thinking dots */}
         <AnimatePresence>
-          {emotion === "thinking" && (
+          {effectiveEmotion === "thinking" && (
             <motion.div
               className="absolute -top-6 left-1/2 -translate-x-1/2 flex gap-1.5"
               initial={{ opacity: 0, y: 8 }}

@@ -2,12 +2,17 @@ import { useState, useEffect } from "react"
 import { AiCharacter } from "@/components/AiCharacter/AiCharacter"
 import { ChatPanel } from "@/components/Chat/ChatPanel"
 import { InputBar } from "@/components/Input/InputBar"
+import { ModeIndicator } from "@/components/ModeIndicator/ModeIndicator"
 import { SettingsPanel } from "@/components/Settings/SettingsPanel"
 import { useWebSocket } from "@/hooks/useWebSocket"
+import { useChatStore } from "@/store/chatStore"
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { connect, disconnect, sendMessage, isConnected } = useWebSocket()
+  const { connect, disconnect, sendMessage, switchMode, isConnected } = useWebSocket()
+  const mode = useChatStore((s) => s.mode)
+  const isProcessing = useChatStore((s) => s.isProcessing)
+  const isSummarizing = useChatStore((s) => s.isSummarizing)
 
   useEffect(() => {
     connect()
@@ -25,21 +30,24 @@ function App() {
         <AiCharacter />
       </div>
 
-      {/* Status dot */}
+      {/* Mode Indicator */}
       <div className="relative z-10 flex justify-center pb-1">
-        <div className="flex items-center gap-1.5">
-          <div
-            className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
-              isConnected ? "bg-emerald-400" : "bg-white/20"
-            }`}
-          />
-          <span className="text-[10px] text-white/25 tracking-wider uppercase">
-            {isConnected ? "Online" : "Offline"}
-          </span>
+        <div className="flex items-center gap-2">
+          <ModeIndicator />
+          <div className="flex items-center gap-1.5">
+            <div
+              className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                isConnected ? "bg-emerald-400" : "bg-white/20"
+              }`}
+            />
+            <span className="text-[10px] text-white/25 tracking-wider uppercase">
+              {isConnected ? "Online" : "Offline"}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Chat */}
+      {/* Chat / Listening Log */}
       <div className="relative z-10 flex-1 min-h-0">
         <ChatPanel />
       </div>
@@ -48,10 +56,14 @@ function App() {
       <div className="relative z-10">
         <InputBar
           onSend={sendMessage}
+          onSwitchMode={switchMode}
           onOpenSettings={() => setSettingsOpen(true)}
           onConnect={connect}
           isConnected={isConnected}
           canConnect={!isConnected}
+          currentMode={mode}
+          isProcessing={isProcessing}
+          isSummarizing={isSummarizing}
         />
       </div>
 
