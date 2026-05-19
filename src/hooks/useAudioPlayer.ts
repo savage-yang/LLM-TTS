@@ -78,6 +78,10 @@ export function useAudioPlayer() {
   }, [initProcessor])
 
   const resetChunks = useCallback(() => {
+    // 重置 AudioWorklet 缓冲区
+    if (processorRef.current) {
+      processorRef.current.port.postMessage('reset')
+    }
     stop()
   }, [stop])
 
