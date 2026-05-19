@@ -528,6 +528,14 @@ class WebSocketStreamPlayer(AbstractPlayer):
     def stop(self):
         self._playing = False
         self.clear_buffer()
+        if self.websocket and self.websocket.client_state.value == 1:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self.websocket.send_json({"type": "tts_end", "interrupted": True}),
+                    self.loop
+                )
+            except Exception as e:
+                logger.error(f"[WSStreamPlayer] stop 发送通知失败: {e}")
 
     def clear_buffer(self):
         pass

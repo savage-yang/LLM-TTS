@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { useChatStore } from "@/store/chatStore"
 import type { EmotionType } from "@/types"
+import { SpeechBubble } from "@/components/SpeechBubble/SpeechBubble"
 
 function PixelEye({ side, emotion }: { side: "left" | "right"; emotion: EmotionType }) {
   const isLeft = side === "left"
@@ -98,6 +99,8 @@ export function AiCharacter() {
 
   return (
     <div className="relative flex items-center justify-center select-none">
+      <SpeechBubble />
+
       <motion.div
         initial={{ opacity: 0, scale: 0.85 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -143,7 +146,7 @@ export function AiCharacter() {
           <AnimatePresence>
             {effectiveEmotion === "thinking" && (
               <motion.div
-                className="absolute left-1/2 -translate-x-1/2 flex gap-2"
+                className="absolute inset-x-0 flex justify-center gap-2"
                 style={{ top: -30 }}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}

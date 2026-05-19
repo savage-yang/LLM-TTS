@@ -216,6 +216,7 @@ async def websocket_endpoint(ws: WebSocket):
             "tts_enabled": True,
             "modules_loaded": True,
             "summary_interval": robot.listening_manager.summary_interval,
+            "dialogue_idle_timeout": robot.listening_manager.dialogue_idle_timeout,
         })
 
         robot.start_recording_and_vad()
@@ -258,6 +259,9 @@ async def websocket_endpoint(ws: WebSocket):
                             content = data.get("content", "").strip()
                             if content:
                                 threading.Thread(target=robot._submit_chat, args=(content, False), daemon=True).start()
+
+                        if msg_type == "interrupt":
+                            robot.interrupt_playback()
 
                 elif msg["type"] == "websocket.disconnect":
                     break

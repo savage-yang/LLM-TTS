@@ -44,13 +44,13 @@ function CountdownTimer({ seconds }: { seconds: number }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex items-center gap-3 px-5 py-3 rounded-xl bg-blue-400/[0.07] border border-blue-400/[0.15]"
     >
-      <Clock size={14} className="text-white/25" />
-      <span className="text-sm text-white/25 font-medium">下次总结: </span>
-      <span className="text-sm text-blue-300/60 font-semibold tabular-nums">{display}</span>
+      <Clock size={20} className="text-blue-300/50" />
+      <span className="text-base text-white/30 font-medium">下次总结: </span>
+      <span className="text-xl text-blue-200/70 font-bold tabular-nums tracking-wide">{display}</span>
     </motion.div>
   )
 }
@@ -113,7 +113,7 @@ export function ListeningSummaryPanel() {
           <div className="w-2 h-2 rounded-full bg-blue-400/50" />
           <h3 className="text-base text-white/30 font-semibold tracking-wide">监听记录</h3>
           <div className="ml-auto">
-            {mode === "listening" && <CountdownTimer seconds={countdown} />}
+            <CountdownTimer seconds={countdown} />
           </div>
         </div>
 

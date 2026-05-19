@@ -28,6 +28,7 @@ export type ServerMessageType =
   | "tts_end"
   | "tts_error"
   | "llm_token"
+  | "buffer_audio"
 
 export interface ServerMessage {
   type: ServerMessageType
@@ -50,10 +51,13 @@ export interface ServerMessage {
   is_last?: boolean
   error?: string
   modules_loaded?: boolean
+  summary_interval?: number
+  dialogue_idle_timeout?: number
+  interrupted?: boolean
 }
 
 export interface ClientMessage {
-  type: "message" | "connect" | "switch_mode"
+  type: "message" | "connect" | "switch_mode" | "interrupt"
   content?: string
   client_id?: string
   mode?: AppMode

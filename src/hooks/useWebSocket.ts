@@ -5,7 +5,7 @@ import type { ServerMessage } from "@/types"
 interface UseWebSocketOptions {
   onTtsChunk?: (data: string, isLast: boolean) => void
   onTtsStart?: () => void
-  onTtsEnd?: () => void
+  onTtsEnd?: (interrupted?: boolean) => void
 }
 
 export function useWebSocket(options?: UseWebSocketOptions) {
@@ -30,6 +30,9 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     setLastRecordedText,
     setSummarizing,
     setTtsSpeaking,
+    setIsInterrupted,
+    setDialogueIdleTimeout,
+    setLastDialogueTime,
   } = useChatStore()
 
   const connectRef = useRef<() => void>(() => {})
@@ -37,7 +40,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     if (wsRef.current?.readyState === WebSocket.OPEN ||
         wsRef.current?.readyState === WebSocket.CONNECTING) return
 
-    // 先关闭旧连接
     if (wsRef.current) {
       try { wsRef.current.close() } catch {}
       wsRef.current = null
@@ -66,6 +68,8 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               if (data.mode) setMode(data.mode)
               if (data.wake_word) setWakeWord(data.wake_word)
               if (data.word_count !== undefined) setWordCount(data.word_count)
+              if (data.dialogue_idle_timeout) setDialogueIdleTimeout(data.dialogue_idle_timeout)
+              if (data.mode === "dialogue") setLastDialogueTime(Date.now())
               break
 
             case "mode_change":
@@ -76,6 +80,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                   setMouthOpen(false)
                 } else if (data.mode === "dialogue") {
                   setCharacterEmotion(data.reason === "wake_word" ? "happy" : "idle")
+                  setLastDialogueTime(Date.now())
                 }
               }
               break
@@ -86,8 +91,26 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               if (data.summarizing) setSummarizing(true)
               break
 
+            case "buffer_audio":
+              if (data.data) {
+                try {
+                  const binaryStr = atob(data.data)
+                  const bytes = new Uint8Array(binaryStr.length)
+                  for (let i = 0; i < binaryStr.length; i++) {
+                    bytes[i] = binaryStr.charCodeAt(i)
+                  }
+                  const blob = new Blob([bytes], { type: "audio/wav" })
+                  const url = URL.createObjectURL(blob)
+                  const audio = new Audio(url)
+                  audio.play().catch(() => {})
+                  setTimeout(() => URL.revokeObjectURL(url), 5000)
+                } catch {}
+              }
+              break
+
             case "tts_start":
               hasReceivedAudioRef.current = false
+              setIsInterrupted(false)
               setTtsSpeaking(true)
               setCharacterEmotion("speaking")
               optionsRef.current?.onTtsStart?.()
@@ -101,16 +124,22 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               break
 
             case "tts_end":
-              if (!hasReceivedAudioRef.current) {
+              if (data.interrupted) {
                 setTtsSpeaking(false)
                 setMouthOpen(false)
-                setCharacterEmotion("happy")
+                setCharacterEmotion("idle")
+                setIsInterrupted(true)
+              } else {
+                if (!hasReceivedAudioRef.current) {
+                  setTtsSpeaking(false)
+                  setMouthOpen(false)
+                  setCharacterEmotion("happy")
+                }
+                setTimeout(() => {
+                  useChatStore.getState().setLlmBubbleText("")
+                }, 3000)
               }
-              // TTS 播放完毕，清除对话气泡
-              setTimeout(() => {
-                useChatStore.getState().setLlmBubbleText("")
-              }, 3000)
-              optionsRef.current?.onTtsEnd?.()
+              optionsRef.current?.onTtsEnd?.(data.interrupted)
               break
 
             case "tts_error":
@@ -121,8 +150,8 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               break
 
             case "llm_token": {
-              // LLM 流式 token：实时显示生成中的文本
               if (data.content) {
+                setIsInterrupted(false)
                 setProcessing(true)
                 setMouthOpen(true)
                 const msgs = useChatStore.getState().messages
@@ -158,8 +187,10 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                 break
               }
 
+              setIsInterrupted(false)
               if (msg.is_final) {
                 setProcessing(false)
+                setLastDialogueTime(Date.now())
                 setMouthOpen(false)
                 if (msg.emotion) {
                   setCharacterEmotion(msg.emotion)
@@ -213,7 +244,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       }
 
       ws.onerror = () => {
-        // 不要在此处调用 ws.close()，让 onclose 统一处理
       }
     } catch {
       reconnectTimer.current = setTimeout(() => connectRef.current(), 3000)
@@ -254,6 +284,11 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     []
   )
 
+  const sendInterrupt = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: "interrupt" }))
+  }, [])
+
   useEffect(() => {
     return () => {
       connectIdRef.current++
@@ -266,5 +301,5 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     }
   }, [])
 
-  return { connect, disconnect, sendMessage, switchMode, isConnected, wsRef }
+  return { connect, disconnect, sendMessage, switchMode, sendInterrupt, isConnected, wsRef }
 }

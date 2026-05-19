@@ -14,6 +14,9 @@ interface ChatStore {
   wordCount: number
   lastRecordedText: string
   llmBubbleText: string
+  isInterrupted: boolean
+  dialogueIdleTimeout: number
+  lastDialogueTime: number
 
   addMessage: (message: Message) => void
   updateLastAssistantMessage: (content: string) => void
@@ -29,7 +32,10 @@ interface ChatStore {
   setTtsSpeaking: (v: boolean) => void
   setWsUrl: (url: string) => void
   setLlmBubbleText: (text: string) => void
+  setIsInterrupted: (v: boolean) => void
   resetMessages: () => void
+  setDialogueIdleTimeout: (v: number) => void
+  setLastDialogueTime: (v: number) => void
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -51,6 +57,9 @@ export const useChatStore = create<ChatStore>((set) => ({
   wordCount: 0,
   lastRecordedText: "",
   llmBubbleText: "",
+  isInterrupted: false,
+  dialogueIdleTimeout: 150,
+  lastDialogueTime: Date.now(),
 
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -85,5 +94,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   setTtsSpeaking: (v) => set({ isTtsSpeaking: v }),
   setWsUrl: (url) => set({ wsUrl: url }),
   setLlmBubbleText: (text) => set({ llmBubbleText: text }),
+  setIsInterrupted: (v) => set({ isInterrupted: v }),
   resetMessages: () => set({ messages: [] }),
+  setDialogueIdleTimeout: (v) => set({ dialogueIdleTimeout: v }),
+  setLastDialogueTime: (v) => set({ lastDialogueTime: v }),
 }))

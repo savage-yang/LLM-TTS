@@ -85,6 +85,12 @@ export function useAudioPlayer() {
     stop()
   }, [stop])
 
+  const clearBuffer = useCallback(() => {
+    if (processorRef.current) {
+      processorRef.current.port.postMessage('reset')
+    }
+  }, [])
+
   const isSupported = typeof window !== "undefined" && !!(window.AudioContext || (window as any).webkitAudioContext)
 
   return {
@@ -92,6 +98,7 @@ export function useAudioPlayer() {
     isPlaying: isPlayingRef.current,
     appendChunk,
     resetChunks,
+    clearBuffer,
     stop,
   }
 }

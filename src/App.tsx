@@ -4,7 +4,6 @@ import { AiCharacter } from "@/components/AiCharacter/AiCharacter"
 import { ChatPanel } from "@/components/Chat/ChatPanel"
 import { ModeIndicator } from "@/components/ModeIndicator/ModeIndicator"
 import { SettingsPanel } from "@/components/Settings/SettingsPanel"
-import { SpeechBubble } from "@/components/SpeechBubble/SpeechBubble"
 import { ListeningSummaryPanel } from "@/components/ListeningSummary/ListeningSummaryPanel"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition"
@@ -19,11 +18,11 @@ function App() {
   const [micEnabled, setMicEnabled] = useState(false)
   const [micError, setMicError] = useState<string | null>(null)
 
-  const { isSupported: audioSupported, appendChunk: onTtsChunk, resetChunks: onTtsStart, stop: stopTts } = useAudioPlayer()
-  const { connect, disconnect, sendMessage, switchMode, isConnected, wsRef } = useWebSocket({
+  const { isSupported: audioSupported, appendChunk: onTtsChunk, resetChunks: onTtsStart, clearBuffer } = useAudioPlayer()
+  const { connect, disconnect, sendMessage, switchMode, sendInterrupt, isConnected, wsRef } = useWebSocket({
     onTtsChunk,
     onTtsStart,
-    onTtsEnd: () => {},
+    onTtsEnd: (interrupted) => { if (interrupted) clearBuffer() },
   })
 
   const { isSupported: micSupported, isRecording: isMicListening, startRecording, stopRecording } = useSpeechRecognition({
@@ -33,8 +32,25 @@ function App() {
 
   const mode = useChatStore((s) => s.mode)
   const isProcessing = useChatStore((s) => s.isProcessing)
-  const isSummarizing = useChatStore((s) => s.isSummarizing)
   const isTtsSpeaking = useChatStore((s) => s.isTtsSpeaking)
+  const dialogueIdleTimeout = useChatStore((s) => s.dialogueIdleTimeout)
+  const lastDialogueTime = useChatStore((s) => s.lastDialogueTime)
+  const [dialogueCountdown, setDialogueCountdown] = useState(dialogueIdleTimeout)
+
+  useEffect(() => {
+    if (mode !== "dialogue") {
+      setDialogueCountdown(dialogueIdleTimeout)
+      return
+    }
+    const updateCountdown = () => {
+      const elapsed = Math.floor((Date.now() - lastDialogueTime) / 1000)
+      const remaining = Math.max(0, dialogueIdleTimeout - elapsed)
+      setDialogueCountdown(remaining)
+    }
+    updateCountdown()
+    const timer = setInterval(updateCountdown, 1000)
+    return () => clearInterval(timer)
+  }, [mode, dialogueIdleTimeout, lastDialogueTime])
 
   useEffect(() => {
     connect()
@@ -83,11 +99,11 @@ function App() {
         <div className="absolute top-1/4 left-1/3 w-[300px] h-[300px] bg-indigo-400/[0.04] rounded-full blur-[120px]" />
       </div>
 
-      {/* Center area */}
-      <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
-        {/* Top-right status */}
-        <div className="absolute top-5 right-6 flex items-center gap-3">
-          <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/[0.06] border border-white/[0.12] shadow-sm">
+      {/* ===== Top bar: status + mic + mode ===== */}
+      <div className="relative z-10 pt-2 pb-0">
+        <div className="max-w-lg mx-auto flex items-center justify-center gap-3 px-6">
+          {/* Connection status */}
+          <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/[0.06] border border-white/[0.12]">
             <div
               className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
                 isConnected ? "bg-emerald-400" : "bg-white/35"
@@ -96,101 +112,95 @@ function App() {
             <span className="text-sm text-white/70 tracking-wide font-medium">
               {isConnected ? "已连接" : "未连接"}
             </span>
-          </div>
-          {audioSupported && isTtsSpeaking && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-400/[0.08] border border-cyan-400/[0.18]"
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="text-sm text-cyan-300/80 font-medium">Qwen TTS</span>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Character */}
-        <AiCharacter />
-
-        {/* Speech Bubble - LLM 回复显示 */}
-        <SpeechBubble />
-
-        {/* Mode indicator */}
-        <div className="mt-3 mb-8">
-          <ModeIndicator />
-        </div>
-
-        {/* Mic button / status + mode toggle */}
-        <div className="flex items-center gap-4 mt-3">
-          {!micEnabled ? (
-            <motion.button
-              onClick={handleActivateMic}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-3 px-7 py-3.5 rounded-full 
-                bg-gradient-to-r from-blue-500/25 to-cyan-500/20 
-                border-2 border-blue-400/40 text-blue-100 text-lg font-semibold
-                shadow-xl shadow-blue-500/15 hover:shadow-blue-500/30 hover:border-blue-400/55
-                transition-all duration-300 cursor-pointer"
-            >
-              <Mic size={22} />
-              启用麦克风
-            </motion.button>
-          ) : (
-            <div className={`flex items-center gap-3 px-4 py-2.5 rounded-full border-2 text-base font-semibold transition-all duration-300 ${
-              isMicListening
-                ? "border-emerald-400/35 text-emerald-300/90 bg-emerald-400/[0.10]"
-                : "border-white/[0.14] text-white/45 bg-white/[0.04]"
-            }`}>
+            {audioSupported && isTtsSpeaking && (
               <motion.div
-                className="w-3 h-3 rounded-full"
-                animate={
-                  isMicListening
-                    ? { scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }
-                    : { scale: [1] }
-                }
-                transition={{
-                  duration: isMicListening ? 1.2 : 0,
-                  repeat: isMicListening ? Infinity : 0,
-                  ease: "easeInOut",
-                }}
-                style={{
-                  backgroundColor: isMicListening
-                    ? "rgba(52, 211, 153, 0.9)"
-                    : "rgba(255,255,255,0.20)",
-                }}
-              />
-              <span>{isMicListening ? "🎤 正在聆听" : "麦克风"}</span>
-            </div>
-          )}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="ml-2 flex items-center gap-1.5"
+              >
+                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-xs text-cyan-300/80 font-medium">TTS</span>
+              </motion.div>
+            )}
+          </div>
 
-          <button
-            onClick={() => switchMode(mode === "listening" ? "dialogue" : "listening")}
-            disabled={!isConnected}
-            className={`px-5 py-2.5 rounded-full border-2 text-base font-semibold transition-all duration-300
-              disabled:opacity-25 disabled:cursor-not-allowed
-              ${
-                mode === "listening"
-                  ? "border-blue-400/28 text-blue-300/80 hover:bg-blue-400/[0.07]"
-                  : "border-amber-400/28 text-amber-300/80 hover:bg-amber-400/[0.07]"
-              }`}
-          >
-            {mode === "listening" ? "🔊 监听模式" : "💬 对话模式"}
-          </button>
+          {/* Mic + Mode */}
+          <div className="flex items-center gap-3">
+            {!micEnabled ? (
+              <motion.button
+                onClick={handleActivateMic}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="flex items-center gap-2 px-5 py-2 rounded-full
+                  bg-gradient-to-r from-blue-500/25 to-cyan-500/20
+                  border-2 border-blue-400/40 text-blue-100 text-sm font-semibold
+                  shadow-lg shadow-blue-500/15 hover:shadow-blue-500/30 hover:border-blue-400/55
+                  transition-all duration-300 cursor-pointer"
+              >
+                <Mic size={18} />
+                启用麦克风
+              </motion.button>
+            ) : (
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-semibold transition-all duration-300 ${
+                isMicListening
+                  ? "border-emerald-400/35 text-emerald-300/90 bg-emerald-400/[0.10]"
+                  : "border-white/[0.14] text-white/45 bg-white/[0.04]"
+              }`}>
+                <motion.div
+                  className="w-2.5 h-2.5 rounded-full"
+                  animate={
+                    isMicListening
+                      ? { scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }
+                      : { scale: [1] }
+                  }
+                  transition={{
+                    duration: isMicListening ? 1.2 : 0,
+                    repeat: isMicListening ? Infinity : 0,
+                    ease: "easeInOut",
+                  }}
+                  style={{
+                    backgroundColor: isMicListening
+                      ? "rgba(52, 211, 153, 0.9)"
+                      : "rgba(255,255,255,0.20)",
+                  }}
+                />
+                <span>{isMicListening ? "🎤 聆听中" : "麦克风"}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => switchMode(mode === "listening" ? "dialogue" : "listening")}
+              disabled={!isConnected}
+              className={`px-4 py-2 rounded-full border-2 text-sm font-semibold transition-all duration-300
+                disabled:opacity-25 disabled:cursor-not-allowed
+                ${
+                  mode === "listening"
+                    ? "border-blue-400/28 text-blue-300/80 hover:bg-blue-400/[0.07]"
+                    : "border-amber-400/28 text-amber-300/80 hover:bg-amber-400/[0.07]"
+                }`}
+            >
+              {mode === "listening" ? "🔊 监听" : "💬 对话"}
+            </button>
+
+            {mode === "dialogue" && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-400/[0.08] border border-amber-400/[0.15]">
+                <span className="text-sm text-amber-200/60 font-semibold tabular-nums">{dialogueCountdown}s</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Hint - bright white text */}
-        <p className="mt-6 text-lg text-white/50 max-w-lg text-center leading-relaxed font-medium">
+        {/* Hint text */}
+        <p className="mt-2 text-base text-white/40 max-w-lg mx-auto text-center px-6 font-medium">
           {!micEnabled
-            ? "👆 点击上方「启用麦克风」按钮开始语音交互（ASR+VAD+LLM+TTS）"
+            ? "点击「启用麦克风」开始语音交互"
             : mode === "listening"
               ? isMicListening
-                ? "正在持续监听，说出「小爱」即可唤醒我进入对话模式"
+                ? "持续监听中，说「小爱」唤醒"
                 : "等待麦克风权限..."
               : isProcessing
-                ? "正在思考回复..."
-                : "对话模式中，可以直接说话或点击右下角查看消息记录"}
+                ? "思考回复中..."
+                : "对话模式，可直接说话"}
         </p>
 
         {/* Mic error toast */}
@@ -199,60 +209,70 @@ function App() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mt-4 max-w-lg mx-auto px-5 py-3 rounded-xl bg-red-500/15 border border-red-400/25 text-red-300/90 text-sm text-center"
+            className="mt-3 max-w-lg mx-auto px-5 py-2.5 rounded-xl bg-red-500/15 border border-red-400/25 text-red-300/90 text-sm text-center"
           >
             {micError}
           </motion.div>
         )}
       </div>
 
-      {/* Bottom bar */}
-      <div className="relative z-10 pb-8 pt-3">
-        <div className="max-w-lg mx-auto flex items-center justify-between px-10">
+      {/* ===== Center: robot face (absolute center) ===== */}
+      <div className="flex-1 flex flex-col items-center justify-center relative z-10">
+        <AiCharacter />
+        <div className="mt-3">
+          <ModeIndicator />
+        </div>
+      </div>
+
+      {/* ===== Bottom bar: 4 buttons with labels ===== */}
+      <div className="relative z-10 pb-2 pt-0">
+        <div className="max-w-lg mx-auto flex items-center justify-between px-6">
           <button
             onClick={() => !isConnected && connect()}
-            className={`p-4 rounded-full transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300 ${
               isConnected
                 ? "text-emerald-400/60"
                 : "text-white/30 hover:text-white/55 hover:bg-white/[0.06]"
             }`}
-            title={isConnected ? "已连接" : "重新连接"}
           >
-            {isConnected ? <Wifi size={28} /> : <WifiOff size={28} />}
+            {isConnected ? <Wifi size={24} /> : <WifiOff size={24} />}
+            <span className="text-[11px] font-medium tracking-wide">
+              {isConnected ? "已连接" : "重连"}
+            </span>
           </button>
 
           <button
             onClick={() => setChatOpen(!chatOpen)}
-            className={`p-4 rounded-full transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300 ${
               chatOpen
                 ? "text-blue-300/90 bg-blue-400/[0.12]"
                 : "text-white/70 hover:text-white/90 hover:bg-white/[0.08]"
             }`}
-            title="查看对话记录"
           >
-            <MessageSquare size={28} />
+            <MessageSquare size={24} />
+            <span className="text-[11px] font-medium tracking-wide">对话</span>
           </button>
 
           <button
             onClick={() => { setSummaryOpen(!summaryOpen); setChatOpen(false); }}
-            className={`p-4 rounded-full transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300 ${
               summaryOpen
                 ? "text-blue-300/90 bg-blue-400/[0.12]"
                 : "text-white/70 hover:text-white/90 hover:bg-white/[0.08]"
             }`}
-            title="查看监听记录"
           >
-            <ScrollText size={28} />
+            <ScrollText size={24} />
+            <span className="text-[11px] font-medium tracking-wide">监听</span>
           </button>
 
           <button
             onClick={() => setSettingsOpen(true)}
-            className="p-4 rounded-full text-white/30
-              hover:text-white/55 hover:bg-white/[0.06]
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl
+              text-white/30 hover:text-white/55 hover:bg-white/[0.06]
               transition-all duration-200"
-            title="设置"
           >
-            <Settings size={28} />
+            <Settings size={24} />
+            <span className="text-[11px] font-medium tracking-wide">设置</span>
           </button>
         </div>
       </div>
