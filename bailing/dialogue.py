@@ -77,12 +77,9 @@ class Dialogue:
         """
         self.dialogue.append(message)
 
-    def get_llm_dialogue(self, max_rounds: int = 20) -> List[Dict[str, Any]]:
+    def get_llm_dialogue(self) -> List[Dict[str, Any]]:
         """
         获取LLM格式的对话列表，用于发送给大模型
-        
-        Args:
-            max_rounds: 最大保留对话轮数（1轮=user+assistant），超出则截断旧对话
         
         Returns:
             符合OpenAI API格式的对话列表
@@ -105,16 +102,12 @@ class Dialogue:
                     "role": msg.role,
                     "content": msg.content
                 })
-
-        if len(dialogue) > max_rounds * 2 + 1:
-            system_msg = dialogue[0] if dialogue and dialogue[0]["role"] == "system" else None
-            rest = dialogue[1:] if system_msg else dialogue
-            rest = rest[-(max_rounds * 2):]
-            if system_msg:
-                rest.insert(0, system_msg)
-            dialogue = rest
-
         return dialogue
+
+    def reset_for_new_session(self) -> None:
+        """重置对话为仅保留 system prompt，模拟 main.py 每次启动的行为"""
+        system_msgs = [m for m in self.dialogue if m.role == "system"]
+        self.dialogue = system_msgs
 
     def dump_dialogue(self) -> None:
         """

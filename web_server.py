@@ -258,6 +258,9 @@ async def websocket_endpoint(ws: WebSocket):
 
     robot = _get_or_create_robot(loop)
 
+    # 新连接时重置对话历史为仅保留 system prompt（与 main.py 每次启动行为一致）
+    robot.dialogue.reset_for_new_session()
+
     # 绑定当前 WebSocket（事件回调会发到这里）
     with _current_ws_lock:
         global _current_ws
