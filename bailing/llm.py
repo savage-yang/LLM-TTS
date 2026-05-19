@@ -71,7 +71,7 @@ class OpenAILLM(LLM):
                 model=self.model_name,
                 messages=dialogue,
                 stream=True,
-                **self.extra_body
+                extra_body=self.extra_body
             )
             for chunk in responses:
                 content = chunk.choices[0].delta.content

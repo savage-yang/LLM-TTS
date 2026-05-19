@@ -468,26 +468,43 @@ class WebSocketStreamPlayer(AbstractPlayer):
         self.loop = None
         self._playing = False
         self.sentence_id = 0
+        self._send_fn = None
 
     def init(self, websocket, loop):
         self.websocket = websocket
         self.loop = loop
 
+    def set_send_fn(self, send_fn, loop):
+        """设置动态发送函数（全局单例模式，WebSocket 可变）"""
+        self._send_fn = send_fn
+        self.loop = loop
+
+    def _send_json(self, data: dict):
+        if self._send_fn:
+            try:
+                self._send_fn(data)
+            except Exception as e:
+                logger.error(f"[WSStreamPlayer] 发送失败: {e}")
+            return
+        if self.websocket and self.websocket.client_state.value == 1:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self.websocket.send_json(data),
+                    self.loop
+                )
+            except Exception as e:
+                logger.error(f"[WSStreamPlayer] 发送失败: {e}")
+
     def feed_audio(self, audio_data: bytes) -> None:
         """将 PCM 音频块发送到前端（base64 编码）"""
-        if not self.websocket or self.websocket.client_state.value != 1:
-            return
         self._playing = True
         try:
             import base64 as _b64
-            asyncio.run_coroutine_threadsafe(
-                self.websocket.send_json({
-                    "type": "tts_audio_chunk",
-                    "data": _b64.b64encode(audio_data).decode("ascii"),
-                    "is_last": False,
-                }),
-                self.loop
-            )
+            self._send_json({
+                "type": "tts_audio_chunk",
+                "data": _b64.b64encode(audio_data).decode("ascii"),
+                "is_last": False,
+            })
         except Exception as e:
             logger.error(f"[WSStreamPlayer] 发送音频失败: {e}")
 
@@ -500,62 +517,34 @@ class WebSocketStreamPlayer(AbstractPlayer):
     def interrupt(self):
         """发送打断命令"""
         self._playing = False
-        if self.websocket and self.websocket.client_state.value == 1:
-            try:
-                asyncio.run_coroutine_threadsafe(
-                    self.websocket.send_text(json.dumps({"type": "interrupt"})),
-                    self.loop
-                )
-            except Exception as e:
-                logger.error(f"[WSStreamPlayer] 发送中断失败: {e}")
+        self._send_json({"type": "interrupt"})
 
     def finish(self) -> None:
         """发送TTS完成信号"""
-        if not self.websocket or self.websocket.client_state.value != 1:
-            return
-        try:
-            asyncio.run_coroutine_threadsafe(
-                self.websocket.send_json({
-                    "type": "tts_audio_chunk",
-                    "data": "",
-                    "is_last": True,
-                }),
-                self.loop
-            )
-        except Exception as e:
-            logger.error(f"[WSStreamPlayer] 发送完成信号失败: {e}")
+        self._send_json({
+            "type": "tts_audio_chunk",
+            "data": "",
+            "is_last": True,
+        })
 
     def stop(self):
         self._playing = False
         self.clear_buffer()
-        if self.websocket and self.websocket.client_state.value == 1:
-            try:
-                asyncio.run_coroutine_threadsafe(
-                    self.websocket.send_json({"type": "tts_end", "interrupted": True}),
-                    self.loop
-                )
-            except Exception as e:
-                logger.error(f"[WSStreamPlayer] stop 发送通知失败: {e}")
+        self._send_json({"type": "tts_end", "interrupted": True})
 
     def clear_buffer(self):
         pass
 
     def do_playing(self, audio_file: str) -> None:
         """发送 WAV 文件到前端（作为 buffer_audio 类型），并等待前端播放完毕"""
-        if not self.websocket or self.websocket.client_state.value != 1:
-            return
         try:
             with open(audio_file, "rb") as f:
                 wav_data = f.read()
             import base64 as _b64
-            asyncio.run_coroutine_threadsafe(
-                self.websocket.send_json({
-                    "type": "buffer_audio",
-                    "data": _b64.b64encode(wav_data).decode("ascii"),
-                }),
-                self.loop
-            )
-            # 等待前端播放完毕，防止后续 TTS 音频重叠
+            self._send_json({
+                "type": "buffer_audio",
+                "data": _b64.b64encode(wav_data).decode("ascii"),
+            })
             duration = self._get_wav_duration(audio_file)
             time.sleep(duration)
         except Exception as e:

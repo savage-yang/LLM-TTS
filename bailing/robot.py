@@ -354,6 +354,7 @@ class Robot(ABC):
             if self.chat_lock:
                 logger.debug("对话模式已有对话进行中，忽略本次ASR结果")
                 return
+            self._prewarm_tts()
             if self.callback:
                 self.callback({"role": "user", "content": str(processed_text)})
             if self.event_callback:
@@ -843,6 +844,7 @@ class StreamRobot(Robot):
         self.idle_timeout = 300  # 空闲超时时间，单位秒（5分钟）
         self.idle_check_interval = 60  # 空闲检查间隔，单位秒（1分钟）
         self._tts_lock = threading.RLock()  # 保护 current_tts_stream 的读写（可重入，避免同一线程重复申请死锁）
+        self._tts_connecting = False  # 预热线程正在建连标志
         
         self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
         self._prologue_executor = ThreadPoolExecutor(max_workers=1)
@@ -900,6 +902,13 @@ class StreamRobot(Robot):
         self.last_stream_flush_time = time.time()
         
         with self._tts_lock:
+            if self._tts_connecting:
+                for _ in range(50):
+                    self._tts_lock.release()
+                    time.sleep(0.1)
+                    self._tts_lock.acquire()
+                    if not self._tts_connecting:
+                        break
             if self.current_tts_stream and self.current_tts_stream.is_alive():
                 self.current_tts_stream.reset()
                 self._tts_initialized = True
@@ -1016,6 +1025,43 @@ class StreamRobot(Robot):
             filtered = re.sub(r'```json.*?```', '', filtered, flags=re.DOTALL)
             filtered = re.sub(r'\{\"function_name\".*?\}', '', filtered, flags=re.DOTALL)
         return filtered
+
+    def _prewarm_tts(self) -> None:
+        """ASR完成后后台预建TTS连接，与LLM调用并行，消除首token到达后的TTS建连延迟"""
+        try:
+            need_connect = False
+            with self._tts_lock:
+                if (self.current_tts_stream is None
+                    or self.current_tts_stream.client is None
+                    or not self.current_tts_stream.is_alive()):
+                    need_connect = True
+                else:
+                    self.current_tts_stream.reset()
+                    return
+            if not need_connect:
+                return
+            now = time.time()
+            if now - self.last_tts_retry_time < self.TTS_RETRY_CD:
+                return
+            with self._tts_lock:
+                self._tts_connecting = True
+            def _do_prewarm():
+                try:
+                    new_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
+                    new_stream.connect()
+                    with self._tts_lock:
+                        self.current_tts_stream = new_stream
+                        self.last_tts_retry_time = 0
+                        self.tts_consecutive_fail_count = 0
+                        self._tts_connecting = False
+                    logger.info("[预热] TTS连接已提前建立，等待LLM首token")
+                except Exception as e:
+                    with self._tts_lock:
+                        self._tts_connecting = False
+                    logger.debug(f"[预热] TTS预连接失败（不影响后续正常建连）: {e}")
+            threading.Thread(target=_do_prewarm, daemon=True).start()
+        except Exception:
+            pass
 
     def _init_stream_connection(self) -> None:
         try:

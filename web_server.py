@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 小爱智能语音助手 - Web 服务端
-StreamRobot 原生支持 WebSocket 模式，web_server 只负责收发消息
+全局单例 Robot，WebSocket 只做消息转发，与 main.py 行为一致
 """
 
 import asyncio
@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from bailing.robot import create_robot
+from bailing.recorder import WebSocketRecorder
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -93,10 +94,92 @@ if os.path.isdir(assets_dir):
 
 _config_path = os.path.join(BASE_DIR, "config", "config.yaml")
 
+# 全局单例 Robot
+_robot: Optional = None
+_robot_lock = threading.Lock()
+_current_ws: Optional[WebSocket] = None
+_current_ws_lock = threading.Lock()
+_duplex_thread: Optional[threading.Thread] = None
 
-@app.on_event("startup")
-def on_startup():
-    logger.info(f"配置路径: {_config_path}")
+
+def _get_or_create_robot(loop=None):
+    """获取或创建全局单例 Robot，与 main.py 一致只创建一次"""
+    global _robot, _duplex_thread
+    with _robot_lock:
+        if _robot is not None:
+            return _robot
+
+        logger.info("首次连接，创建全局 Robot 实例...")
+        _robot = create_robot(_config_path, websocket=None, loop=loop)
+        _robot.recorder = WebSocketRecorder({})
+
+        from bailing.player import WebSocketStreamPlayer
+        from bailing.utils import read_config
+        config_dict = read_config(_config_path)
+        tts_module = config_dict["selected_module"]["TTS"]
+        tts_cfg = config_dict["TTS"].get(tts_module, {})
+        ws_player = WebSocketStreamPlayer(tts_cfg)
+        _robot.stream_player = ws_player
+        _robot.player = ws_player
+        if _robot.current_tts_stream:
+            _robot.current_tts_stream.stream_player = ws_player
+            _robot.current_tts_stream.callback.player = ws_player
+
+        async def _event_callback(event: dict):
+            with _current_ws_lock:
+                ws = _current_ws
+            if ws is None:
+                return
+            try:
+                await ws.send_json(event)
+            except Exception:
+                pass
+
+        _robot.event_callback = _event_callback
+        _robot._event_loop = loop
+        _robot.listening_manager.event_callback = _event_callback
+        _robot.listening_manager._event_loop = loop
+
+        def _dialogue_callback(msg: dict):
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if not content:
+                return
+            is_final = (role == "assistant")
+            with _current_ws_lock:
+                ws = _current_ws
+            if ws is None:
+                return
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    ws.send_json({
+                        "type": "message",
+                        "role": role,
+                        "content": content,
+                        "is_final": is_final,
+                    }),
+                    _robot._event_loop
+                )
+            except Exception:
+                pass
+
+        _robot.callback = _dialogue_callback
+
+        _robot.start_recording_and_vad()
+        logger.info("全局 Robot 已启动，等待语音指令...")
+
+        def run_duplex():
+            try:
+                while not _robot.stop_event.is_set():
+                    _robot._duplex()
+            except Exception as e:
+                if not _robot.stop_event.is_set():
+                    logger.error(f"_duplex 异常: {e}")
+
+        _duplex_thread = threading.Thread(target=run_duplex, daemon=True)
+        _duplex_thread.start()
+
+        return _robot
 
 
 # ============================================================
@@ -159,9 +242,7 @@ def get_listening_summaries():
 def get_prologue():
     prologue_path = os.path.join(BASE_DIR, "voice_cache", "prologue.wav")
     if os.path.exists(prologue_path):
-        logger.info("正在返回启动音效文件")
         return FileResponse(prologue_path, media_type="audio/wav")
-    logger.warning("启动音效文件不存在：voice_cache/prologue.wav")
     return {"error": "not found"}
 
 
@@ -175,64 +256,42 @@ async def websocket_endpoint(ws: WebSocket):
     client_id = id(ws) % 10000
     logger.info(f"🔗 [#{client_id}] 客户端已连接")
 
-    robot = None
+    robot = _get_or_create_robot(loop)
+
+    # 绑定当前 WebSocket（事件回调会发到这里）
+    with _current_ws_lock:
+        global _current_ws
+        prev_ws = _current_ws
+        _current_ws = ws
+
+    # 更新 event_loop 和播放器发送函数
+    robot._event_loop = loop
+
+    def _ws_send_json(data: dict):
+        asyncio.run_coroutine_threadsafe(ws.send_json(data), loop)
+
+    if hasattr(robot.stream_player, 'set_send_fn'):
+        robot.stream_player.set_send_fn(_ws_send_json, loop)
+    if robot.current_tts_stream and robot.current_tts_stream.callback.player:
+        if hasattr(robot.current_tts_stream.callback.player, 'set_send_fn'):
+            robot.current_tts_stream.callback.player.set_send_fn(_ws_send_json, loop)
+
+    # 发送当前状态
     try:
-        robot = create_robot(_config_path, websocket=ws, loop=loop)
-
-        async def event_callback(event: dict):
-            try:
-                await ws.send_json(event)
-            except Exception as e:
-                logger.error(f"发送事件失败: {e}")
-        robot.event_callback = event_callback
-        robot._event_loop = loop
-        robot.listening_manager.event_callback = event_callback
-        robot.listening_manager._event_loop = loop
-
-        def dialogue_callback(msg: dict):
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if not content:
-                return
-            is_final = (role == "assistant")
-            try:
-                asyncio.run_coroutine_threadsafe(
-                    ws.send_json({
-                        "type": "message",
-                        "role": role,
-                        "content": content,
-                        "is_final": is_final,
-                    }),
-                    loop
-                )
-            except Exception as e:
-                logger.error(f"发送对话消息失败: {e}")
-        robot.callback = dialogue_callback
-
         await ws.send_json({
             "type": "status",
-            "mode": "listening",
-            "word_count": 0,
+            "mode": robot.listening_manager.mode,
+            "word_count": robot.listening_manager.total_word_count,
             "wake_word": "小爱",
             "tts_enabled": True,
             "modules_loaded": True,
             "summary_interval": robot.listening_manager.summary_interval,
             "dialogue_idle_timeout": robot.listening_manager.dialogue_idle_timeout,
         })
+    except Exception:
+        pass
 
-        robot.start_recording_and_vad()
-        logger.info(f"🤖 [#{client_id}] Robot 已启动 (WebSocket 模式)")
-
-        def run_duplex():
-            try:
-                while not robot.stop_event.is_set():
-                    robot._duplex()
-            except Exception as e:
-                if not robot.stop_event.is_set():
-                    logger.error(f"[#{client_id}] _duplex 异常: {e}")
-
-        threading.Thread(target=run_duplex, daemon=True).start()
-
+    try:
         while True:
             try:
                 msg = await ws.receive()
@@ -278,13 +337,11 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception as e:
         logger.error(f"[#{client_id}] 异常: {e}\n{traceback.format_exc()}")
     finally:
-        if robot:
-            robot.stop_event.set()
-            try:
-                robot.shutdown()
-            except Exception:
-                pass
-        logger.info(f"🔌 [#{client_id}] 连接关闭")
+        # 断开时不销毁 Robot，保持全局单例
+        with _current_ws_lock:
+            if _current_ws is ws:
+                _current_ws = None
+        logger.info(f"🔌 [#{client_id}] 连接关闭（Robot 保持运行）")
 
 
 # ============================================================

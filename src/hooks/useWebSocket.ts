@@ -13,6 +13,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>()
   const connectIdRef = useRef(0)
   const hasReceivedAudioRef = useRef(false)
+  const ttsEndedRef = useRef(false)
   const optionsRef = useRef(options)
   optionsRef.current = options
   const {
@@ -63,6 +64,15 @@ export function useWebSocket(options?: UseWebSocketOptions) {
           const data: ServerMessage = JSON.parse(event.data)
 
           switch (data.type) {
+            case "tts_start":
+              hasReceivedAudioRef.current = false
+              ttsEndedRef.current = false
+              setIsInterrupted(false)
+              setTtsSpeaking(true)
+              setCharacterEmotion("speaking")
+              optionsRef.current?.onTtsStart?.()
+              break
+
             case "connected":
             case "status":
               if (data.mode) setMode(data.mode)
@@ -80,10 +90,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                   setMouthOpen(false)
                 } else if (data.mode === "dialogue") {
                   setCharacterEmotion(data.reason === "wake_word" ? "happy" : "idle")
-<<<<<<< HEAD
                   setMouthOpen(false)
-=======
->>>>>>> ad5a09d (UI)
                   setLastDialogueTime(Date.now())
                 }
               }
@@ -128,27 +135,23 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               break
 
             case "tts_end":
+              ttsEndedRef.current = true
               if (data.interrupted) {
                 setTtsSpeaking(false)
                 setMouthOpen(false)
                 setCharacterEmotion("idle")
-                setIsInterrupted(true)
+                setTimeout(() => {
+                  useChatStore.getState().setIsInterrupted(false)
+                }, 1500)
               } else {
-<<<<<<< HEAD
                 // 无论是否收到音频，都重置状态
                 setTtsSpeaking(false)
                 setMouthOpen(false)
-                if (!hasReceivedAudioRef.current) {
-=======
-                if (!hasReceivedAudioRef.current) {
-                  setTtsSpeaking(false)
-                  setMouthOpen(false)
->>>>>>> ad5a09d (UI)
-                  setCharacterEmotion("happy")
-                }
+                setCharacterEmotion("happy")
                 setTimeout(() => {
                   useChatStore.getState().setLlmBubbleText("")
-                }, 3000)
+                  useChatStore.getState().setIsInterrupted(false)
+                }, 8000)
               }
               optionsRef.current?.onTtsEnd?.(data.interrupted)
               break
@@ -164,7 +167,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               if (data.content) {
                 setIsInterrupted(false)
                 setProcessing(true)
-                setMouthOpen(true)
+                if (!ttsEndedRef.current) setMouthOpen(true)
                 const msgs = useChatStore.getState().messages
                 const lastMsg = msgs[msgs.length - 1]
                 if (lastMsg?.role === "assistant") {
@@ -187,6 +190,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
             case "message": {
               const msg = data as ServerMessage
               if (msg.role === "user") {
+                ttsEndedRef.current = false
                 addMessage({
                   id: crypto.randomUUID(),
                   role: "user",
@@ -221,7 +225,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                 }
               } else {
                 setProcessing(true)
-                setMouthOpen(true)
+                if (!ttsEndedRef.current) setMouthOpen(true)
                 if (msg.emotion) {
                   setCharacterEmotion(msg.emotion)
                 }

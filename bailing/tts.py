@@ -295,11 +295,11 @@ class QwenTtsRealtimeStream:
         logger.debug("[QwenTtsStream] 会话已重置，连接保持")
         
     def is_alive(self) -> bool:
-        """检查连接是否还存活，自己维护状态+10秒建连保护期，避免误判"""
+        """检查连接是否还存活，自己维护状态+60秒建连保护期，避免LLM长时间等待期间误判"""
         if not self.client or not self.callback.is_connected:
             return False
-        # 建连成功10秒内直接认为存活，避免客户端内部状态没更新导致误判反复重连
-        if time.time() - self.last_connect_time < 10:
+        # 建连成功60秒内直接认为存活，覆盖LLM首token延迟场景
+        if time.time() - self.last_connect_time < 60:
             return True
         # 超过10秒再校验底层连接状态
         try:

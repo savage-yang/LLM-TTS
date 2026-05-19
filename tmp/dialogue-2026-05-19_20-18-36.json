@@ -1,0 +1,42 @@
+[
+    {
+        "role": "user",
+        "content": "你好，。"
+    },
+    {
+        "role": "assistant",
+        "content": "你好呀！有啥想问的或者需要查的，直接告诉我就行～。"
+    },
+    {
+        "role": "user",
+        "content": "请问现在从上海出发到宁波要几点钟候能到？"
+    },
+    {
+        "role": "assistant",
+        "content": "那你得先告诉我你是几点出发呀？现在开车过去大概要两三个小时，差不多傍晚才到。要是赶高铁，查好时刻表就会快很多哦。"
+    },
+    {
+        "role": "user",
+        "content": "好的，关闭程序。"
+    },
+    {
+        "role": "assistant",
+        "content": "好的，那就不打扰啦，再见～有需要随时找我～。"
+    },
+    {
+        "role": "user",
+        "content": "你好，小爱。"
+    },
+    {
+        "role": "assistant",
+        "content": "你好呀！想问点什么或者查点什么吗？"
+    },
+    {
+        "role": "user",
+        "content": "切换到监听模式。"
+    },
+    {
+        "role": "assistant",
+        "content": "好的，已切换到监听模式啦。有具体需求直接告诉我就行～。"
+    }
+]
