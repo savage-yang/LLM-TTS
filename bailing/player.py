@@ -492,7 +492,7 @@ class WebSocketStreamPlayer(AbstractPlayer):
             logger.error(f"[WSStreamPlayer] 发送音频失败: {e}")
 
     def get_playing_status(self) -> bool:
-        return self._playing
+        return self._playing or self.is_playing
 
     def set_playing_status(self, status: bool):
         self._playing = status
@@ -541,7 +541,7 @@ class WebSocketStreamPlayer(AbstractPlayer):
         pass
 
     def do_playing(self, audio_file: str) -> None:
-        """发送 WAV 文件到前端（作为 buffer_audio 类型）"""
+        """发送 WAV 文件到前端（作为 buffer_audio 类型），并等待前端播放完毕"""
         if not self.websocket or self.websocket.client_state.value != 1:
             return
         try:
@@ -555,8 +555,19 @@ class WebSocketStreamPlayer(AbstractPlayer):
                 }),
                 self.loop
             )
+            # 等待前端播放完毕，防止后续 TTS 音频重叠
+            duration = self._get_wav_duration(audio_file)
+            time.sleep(duration)
         except Exception as e:
             logger.error(f"[WSStreamPlayer] 发送文件失败: {e}")
+
+    def _get_wav_duration(self, audio_file: str) -> float:
+        """从 WAV 文件头计算播放时长"""
+        try:
+            with wave.open(audio_file, 'rb') as wf:
+                return wf.getnframes() / float(wf.getframerate())
+        except Exception:
+            return 2.0
 
 
 def create_instance(class_name: str, *args: Any, **kwargs: Any) -> AbstractPlayer:

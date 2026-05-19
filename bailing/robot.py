@@ -128,6 +128,7 @@ class Robot(ABC):
 
         self.callback = None
         self.event_callback = None  # WebSocket 事件回调：async fn(event: dict)
+        self._event_loop = None     # 主事件循环引用，供后台线程调度 async 回调
 
         self.speech = []
 
@@ -358,11 +359,10 @@ class Robot(ABC):
             if self.event_callback:
                 try:
                     import asyncio as _asyncio
-                    loop = _asyncio.get_event_loop()
-                    if loop.is_running():
+                    if self._event_loop and self._event_loop.is_running():
                         _asyncio.run_coroutine_threadsafe(
                             self.event_callback({"type": "user_text", "content": str(processed_text)}),
-                            loop
+                            self._event_loop
                         )
                 except Exception:
                     pass
@@ -601,11 +601,10 @@ class Robot(ABC):
         if self.event_callback:
             try:
                 import asyncio as _asyncio
-                _loop = _asyncio.get_event_loop()
-                if _loop.is_running():
+                if self._event_loop and self._event_loop.is_running():
                     _asyncio.run_coroutine_threadsafe(
                         self.event_callback({"type": "tts_start", "sentenceId": 0}),
-                        _loop
+                        self._event_loop
                     )
             except Exception:
                 pass
@@ -645,11 +644,10 @@ class Robot(ABC):
                 if self.event_callback:
                     try:
                         import asyncio as _asyncio
-                        _loop = _asyncio.get_event_loop()
-                        if _loop.is_running():
+                        if self._event_loop and self._event_loop.is_running():
                             _asyncio.run_coroutine_threadsafe(
                                 self.event_callback({"type": "llm_token", "content": content}),
-                                _loop
+                                self._event_loop
                             )
                     except Exception:
                         pass
@@ -660,11 +658,10 @@ class Robot(ABC):
         if self.event_callback:
             try:
                 import asyncio as _asyncio
-                _loop = _asyncio.get_event_loop()
-                if _loop.is_running():
+                if self._event_loop and self._event_loop.is_running():
                     _asyncio.run_coroutine_threadsafe(
                         self.event_callback({"type": "tts_end", "sentenceId": 0}),
-                        _loop
+                        self._event_loop
                     )
             except Exception:
                 pass

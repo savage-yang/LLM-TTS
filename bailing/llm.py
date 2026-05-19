@@ -51,21 +51,27 @@ class OpenAILLM(LLM):
     def __init__(self, config: Dict[str, Any]):
         """
         初始化 OpenAI 客户端
-        
+
         Args:
-            config: 配置字典，包含 model_name, api_key, url
+            config: 配置字典，包含 model_name, api_key, url, enable_thinking
         """
         self.model_name = config.get("model_name")
         self.api_key = config.get("api_key")
         self.base_url = config.get("url")
         self.client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
 
+        self.extra_body = {}
+        enable_thinking = config.get("enable_thinking")
+        if enable_thinking is not None:
+            self.extra_body["enable_thinking"] = enable_thinking
+
     def response(self, dialogue: List[Dict[str, str]]) -> Generator[str, None, None]:
         try:
             responses = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=dialogue,
-                stream=True
+                stream=True,
+                **self.extra_body
             )
             for chunk in responses:
                 content = chunk.choices[0].delta.content
@@ -76,8 +82,8 @@ class OpenAILLM(LLM):
             raise
 
     def response_call(
-        self, 
-        dialogue: List[Dict[str, str]], 
+        self,
+        dialogue: List[Dict[str, str]],
         functions_call: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> Generator[Tuple[Optional[str], Optional[Any]], None, None]:
@@ -87,7 +93,8 @@ class OpenAILLM(LLM):
                 model=self.model_name,
                 messages=dialogue,
                 stream=True,
-                tools=actual_tools
+                tools=actual_tools,
+                **self.extra_body
             )
             for chunk in responses:
                 delta = chunk.choices[0].delta

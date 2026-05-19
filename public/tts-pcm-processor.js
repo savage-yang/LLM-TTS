@@ -7,8 +7,8 @@ class TTSPCMProcessor extends AudioWorkletProcessor {
     this.inputSampleRate = 24000  // TTS 输出采样率
     this.outputSampleRate = sampleRate  // AudioContext 采样率（通常 48000）
     this.ratio = this.outputSampleRate / this.inputSampleRate  // 上采样比例
-    // 缓冲配置：等待 0.5 秒音频数据后再开始播放
-    this.bufferDuration = 0.5  // 缓冲时长（秒）
+    // 缓冲配置：等待 0.1 秒音频数据后开始播放，降低延迟
+    this.bufferDuration = 0.1  // 缓冲时长（秒）
     this.bufferThreshold = Math.ceil(this.outputSampleRate * this.bufferDuration)  // 缓冲样本数
     this.isBuffering = true  // 是否处于缓冲阶段
 

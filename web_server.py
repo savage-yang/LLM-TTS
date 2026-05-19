@@ -185,6 +185,7 @@ async def websocket_endpoint(ws: WebSocket):
             except Exception as e:
                 logger.error(f"发送事件失败: {e}")
         robot.event_callback = event_callback
+        robot._event_loop = loop
         robot.listening_manager.event_callback = event_callback
         robot.listening_manager._event_loop = loop
 
