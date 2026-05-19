@@ -38,7 +38,7 @@ export function SpeechBubble() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.8, y: 10 }}
           transition={{ type: "spring", damping: 20, stiffness: 300 }}
-          className="absolute -top-4 right-0 z-20 max-w-[260px]"
+          className="absolute top-0 left-full ml-3 z-20 min-w-[320px] max-w-[400px]"
         >
           <div className="relative">
             <div className="bg-white/95 text-gray-800 rounded-2xl shadow-lg border border-gray-200/50">
@@ -50,8 +50,8 @@ export function SpeechBubble() {
                 </p>
               )}
             </div>
-            {/* 气泡尾巴指向左下方（机器人方向） */}
-            <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[9px] border-t-white/95" />
+            {/* 气泡尾巴指向左侧（机器人方向） */}
+            <div className="absolute top-1/2 -left-2 w-0 h-0 -translate-y-1/2 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[10px] border-r-white/95" />
           </div>
         </motion.div>
       )}

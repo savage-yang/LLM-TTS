@@ -25,17 +25,25 @@ class BarkNotifier:
         if group:
             params["group"] = group
 
-        try:
-            resp = requests.get(url, params=params, timeout=10)
-            if resp.status_code == 200:
-                logger.info(f"Bark推送成功: {title}")
-                return True
-            else:
-                logger.error(f"Bark推送失败 [{resp.status_code}]: {resp.text}")
-                return False
-        except Exception as e:
-            logger.error(f"Bark推送异常: {e}")
-            return False
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                timeout = 15 + attempt * 5
+                resp = requests.get(url, params=params, timeout=timeout)
+                if resp.status_code == 200:
+                    logger.info(f"Bark推送成功: {title}")
+                    return True
+                else:
+                    logger.error(f"Bark推送失败 [{resp.status_code}]: {resp.text}")
+                    if attempt < max_retries - 1:
+                        import time as _time
+                        _time.sleep(1)
+            except Exception as e:
+                logger.error(f"Bark推送异常 (第{attempt+1}次): {e}")
+                if attempt < max_retries - 1:
+                    import time as _time
+                    _time.sleep(1)
+        return False
 
     def send_formatted(self, content: str) -> bool:
         info = self._parse(content)

@@ -160,21 +160,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                 setIsInterrupted(false)
                 setProcessing(true)
                 if (!ttsEndedRef.current) setMouthOpen(true)
-                const msgs = useChatStore.getState().messages
-                const lastMsg = msgs[msgs.length - 1]
-                if (lastMsg?.role === "assistant") {
-                  const newContent = lastMsg.content + data.content
-                  updateLastAssistantMessage(newContent)
-                  useChatStore.getState().setLlmBubbleText(newContent)
-                } else {
-                  addMessage({
-                    id: crypto.randomUUID(),
-                    role: "assistant",
-                    content: data.content,
-                    timestamp: Date.now(),
-                  })
-                  useChatStore.getState().setLlmBubbleText(data.content)
-                }
               }
               break
             }
@@ -215,6 +200,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                     emotion: msg.emotion as any,
                   })
                 }
+                useChatStore.getState().setLlmBubbleText(msg.content)
               } else {
                 setProcessing(true)
                 if (!ttsEndedRef.current) setMouthOpen(true)
