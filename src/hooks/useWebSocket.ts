@@ -11,6 +11,10 @@ interface UseWebSocketOptions {
 export function useWebSocket(options?: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>()
+  const connectIdRef = useRef(0)
+  const hasReceivedAudioRef = useRef(false)
+  const optionsRef = useRef(options)
+  optionsRef.current = options
   const {
     wsUrl,
     isConnected,
@@ -29,19 +33,31 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     setTtsSpeaking,
   } = useChatStore()
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+  const connectRef = useRef<() => void>(() => {})
+  connectRef.current = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) return
+
+    // 先关闭旧连接
+    if (wsRef.current) {
+      try { wsRef.current.close() } catch {}
+      wsRef.current = null
+    }
+
+    const myId = ++connectIdRef.current
 
     try {
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
       ws.onopen = () => {
+        if (connectIdRef.current !== myId) return
         setConnected(true)
         ws.send(JSON.stringify({ type: "connect" }))
       }
 
       ws.onmessage = (event) => {
+        if (connectIdRef.current !== myId) return
         try {
           const data: ServerMessage = JSON.parse(event.data)
 
@@ -92,22 +108,30 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               break
 
             case "tts_start":
+              hasReceivedAudioRef.current = false
               setTtsSpeaking(true)
               setCharacterEmotion("speaking")
-              options?.onTtsStart?.()
+              optionsRef.current?.onTtsStart?.()
               break
 
             case "tts_audio_chunk":
               if (data.data && data.is_last !== undefined) {
-                options?.onTtsChunk?.(data.data, data.is_last)
+                hasReceivedAudioRef.current = true
+                optionsRef.current?.onTtsChunk?.(data.data, data.is_last)
               }
               break
 
             case "tts_end":
-              setTtsSpeaking(false)
-              setMouthOpen(false)
-              setCharacterEmotion("happy")
-              options?.onTtsEnd?.()
+              if (!hasReceivedAudioRef.current) {
+                setTtsSpeaking(false)
+                setMouthOpen(false)
+                setCharacterEmotion("happy")
+              }
+              // TTS 播放完毕，清除对话气泡
+              setTimeout(() => {
+                useChatStore.getState().setLlmBubbleText("")
+              }, 3000)
+              optionsRef.current?.onTtsEnd?.()
               break
 
             case "tts_error":
@@ -116,6 +140,50 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               setCharacterEmotion("idle")
               console.error("TTS error:", data.error)
               break
+
+            case "buffer_audio": {
+              // 缓冲音效：base64 编码的 WAV 文件，直接解码播放
+              if (data.data) {
+                try {
+                  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+                  const raw = atob(data.data)
+                  const bytes = new Uint8Array(raw.length)
+                  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+                  audioCtx.decodeAudioData(bytes.buffer).then((audioBuffer) => {
+                    const source = audioCtx.createBufferSource()
+                    source.buffer = audioBuffer
+                    source.connect(audioCtx.destination)
+                    source.start()
+                    source.onended = () => audioCtx.close()
+                  }).catch(() => audioCtx.close())
+                } catch {}
+              }
+              break
+            }
+
+            case "llm_token": {
+              // LLM 流式 token：实时显示生成中的文本
+              if (data.content) {
+                setProcessing(true)
+                setMouthOpen(true)
+                const msgs = useChatStore.getState().messages
+                const lastMsg = msgs[msgs.length - 1]
+                if (lastMsg?.role === "assistant") {
+                  const newContent = lastMsg.content + data.content
+                  updateLastAssistantMessage(newContent)
+                  useChatStore.getState().setLlmBubbleText(newContent)
+                } else {
+                  addMessage({
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    content: data.content,
+                    timestamp: Date.now(),
+                  })
+                  useChatStore.getState().setLlmBubbleText(data.content)
+                }
+              }
+              break
+            }
 
             case "message": {
               const msg = data as ServerMessage
@@ -178,21 +246,27 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       }
 
       ws.onclose = () => {
+        if (connectIdRef.current !== myId) return
         setConnected(false)
         setProcessing(false)
         setMouthOpen(false)
-        reconnectTimer.current = setTimeout(connect, 3000)
+        reconnectTimer.current = setTimeout(() => connectRef.current(), 3000)
       }
 
       ws.onerror = () => {
-        ws.close()
+        // 不要在此处调用 ws.close()，让 onclose 统一处理
       }
     } catch {
-      reconnectTimer.current = setTimeout(connect, 3000)
+      reconnectTimer.current = setTimeout(() => connectRef.current(), 3000)
     }
-  }, [wsUrl, setConnected, addMessage, updateLastAssistantMessage, setCharacterEmotion, setProcessing, setMouthOpen, setMode, setWakeWord, setWordCount, setLastRecordedText, addSummary, setSummarizing, setTtsSpeaking, options])
+  }
+
+  const connect = useCallback(() => {
+    connectRef.current()
+  }, [])
 
   const disconnect = useCallback(() => {
+    connectIdRef.current++
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current)
     }
@@ -223,8 +297,13 @@ export function useWebSocket(options?: UseWebSocketOptions) {
 
   useEffect(() => {
     return () => {
+      connectIdRef.current++
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-      wsRef.current?.close()
+      const ws = wsRef.current
+      wsRef.current = null
+      if (ws) {
+        try { ws.close() } catch {}
+      }
     }
   }, [])
 

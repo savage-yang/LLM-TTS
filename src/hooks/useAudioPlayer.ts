@@ -3,8 +3,7 @@ import { useChatStore } from "@/store/chatStore"
 
 export function useAudioPlayer() {
   const audioCtxRef = useRef<AudioContext | null>(null)
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null)
-  const chunkBufferRef = useRef<string>("")
+  const processorRef = useRef<AudioWorkletNode | null>(null)
   const isPlayingRef = useRef(false)
 
   const getAudioContext = useCallback(() => {
@@ -17,12 +16,26 @@ export function useAudioPlayer() {
     return audioCtxRef.current
   }, [])
 
+  const initProcessor = useCallback(async () => {
+    const ctx = getAudioContext()
+    if (processorRef.current) return
+
+    try {
+      await ctx.audioWorklet.addModule("/tts-pcm-processor.js")
+      const processor = new AudioWorkletNode(ctx, "tts-pcm-processor")
+      processor.connect(ctx.destination)
+      processorRef.current = processor
+      console.log("[AudioPlayer] TTS PCM processor initialized")
+    } catch (e) {
+      console.error("[AudioPlayer] Failed to initialize processor:", e)
+    }
+  }, [getAudioContext])
+
   const stop = useCallback(() => {
     try {
-      if (sourceRef.current) {
-        try { sourceRef.current.stop() } catch {}
-        sourceRef.current.disconnect()
-        sourceRef.current = null
+      if (processorRef.current) {
+        processorRef.current.disconnect()
+        processorRef.current = null
       }
       if (isPlayingRef.current) {
         isPlayingRef.current = false
@@ -34,6 +47,7 @@ export function useAudioPlayer() {
   }, [])
 
   const playBase64Wav = async (base64Data: string) => {
+    // 保留原有的WAV播放功能作为备用
     try {
       stop()
       const ctx = getAudioContext()
@@ -56,7 +70,6 @@ export function useAudioPlayer() {
       }
 
       source.start(0)
-      sourceRef.current = source
       isPlayingRef.current = true
 
       useChatStore.getState().setCharacterEmotion("speaking")
@@ -70,17 +83,46 @@ export function useAudioPlayer() {
   }
 
   const appendChunk = useCallback((chunk: string, isLast: boolean) => {
-    chunkBufferRef.current += chunk
-    if (isLast && chunkBufferRef.current) {
-      const fullBase64 = chunkBufferRef.current
-      chunkBufferRef.current = ""
-      playBase64Wav(fullBase64)
+    if (!chunk) return
+
+    // 初始化processor（如果尚未初始化）
+    if (!processorRef.current) {
+      initProcessor()
     }
-  }, [])
+
+    if (processorRef.current) {
+      // 将base64音频块转换为PCM16数据
+      const binaryStr = atob(chunk)
+      const bytes = new Uint8Array(binaryStr.length)
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i)
+      }
+
+      // 发送PCM数据到AudioWorklet进行实时播放
+      processorRef.current.port.postMessage(bytes.buffer, [bytes.buffer])
+
+      if (!isPlayingRef.current) {
+        isPlayingRef.current = true
+        useChatStore.getState().setCharacterEmotion("speaking")
+        useChatStore.getState().setMouthOpen(true)
+        useChatStore.getState().setTtsSpeaking(true)
+      }
+    }
+
+    if (isLast) {
+      // 发送完成信号
+      setTimeout(() => {
+        isPlayingRef.current = false
+        useChatStore.getState().setMouthOpen(false)
+        useChatStore.getState().setTtsSpeaking(false)
+        useChatStore.getState().setCharacterEmotion("happy")
+      }, 500) // 延迟500ms确保最后一块音频播放完成
+    }
+  }, [initProcessor])
 
   const resetChunks = useCallback(() => {
-    chunkBufferRef.current = ""
-  }, [])
+    stop()
+  }, [stop])
 
   const isSupported = typeof window !== "undefined" && !!(window.AudioContext || (window as any).webkitAudioContext)
 

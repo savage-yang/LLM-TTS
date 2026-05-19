@@ -16,7 +16,7 @@ class ListeningModeManager:
 
     PUSH_TOKEN = "<|PUSH_NOTIFICATION|>"
 
-    def __init__(self, config: Dict[str, Any], llm, bark_notifier=None):
+    def __init__(self, config: Dict[str, Any], llm, bark_notifier=None, event_callback=None, event_loop=None):
         """
         初始化监听模式管理器
 
@@ -24,10 +24,14 @@ class ListeningModeManager:
             config: 配置字典，包含 WakeWord 和 ListeningMode 配置
             llm: LLM 实例，用于生成监听内容总结
             bark_notifier: BarkNotifier 实例，用于推送重要信息到手机
+            event_callback: WebSocket 事件回调函数
+            event_loop: asyncio 事件循环，用于从后台线程调度异步回调
         """
         self.config = config
         self.llm = llm
         self.bark_notifier = bark_notifier
+        self.event_callback = event_callback
+        self._event_loop = event_loop
         self.summary_manager = SummaryManager(config)
 
         self.mode = "listening"
@@ -72,6 +76,8 @@ class ListeningModeManager:
         with self._lock:
             self.mode = "listening"
         logger.info("切换到监听模式")
+        # 通知前端模式切换
+        self._notify_mode_change("listening", "manual")
 
     def switch_to_dialogue(self):
         """切换到对话模式"""
@@ -79,6 +85,22 @@ class ListeningModeManager:
             self.mode = "dialogue"
             self.last_dialogue_time = time.time()
         logger.info("切换到对话模式")
+        # 通知前端模式切换
+        self._notify_mode_change("dialogue", "manual")
+
+    def _notify_mode_change(self, mode: str, reason: str):
+        """通知前端模式切换"""
+        if self.event_callback:
+            try:
+                import asyncio as _asyncio
+                _loop = self._event_loop or _asyncio.get_event_loop()
+                if _loop.is_running():
+                    _asyncio.run_coroutine_threadsafe(
+                        self.event_callback({"type": "mode_change", "mode": mode, "reason": reason}),
+                        _loop
+                    )
+            except Exception as e:
+                logger.debug(f"发送模式切换通知失败: {e}")
 
     def notify_dialogue_activity(self):
         """标记对话活动，用于检测对话模式空闲超时"""
@@ -115,6 +137,8 @@ class ListeningModeManager:
                 self.mode = "dialogue"
                 self.last_dialogue_time = time.time()
                 logger.info("切换到对话模式")
+                # 通知前端模式切换
+                self._notify_mode_change("dialogue", "wake_word")
                 cleaned = text.strip().replace(matched, "").strip()
                 if not cleaned:
                     logger.debug("仅检测到唤醒词，无后续内容，忽略")
@@ -130,6 +154,8 @@ class ListeningModeManager:
             if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
                 logger.info(f"对话模式空闲超过{self.dialogue_idle_timeout}秒，自动切回监听模式")
                 self.mode = "listening"
+                # 通知前端模式切换
+                self._notify_mode_change("listening", "idle_timeout")
                 logger.debug("模式切换时的ASR结果不加入监听池")
                 return None, False
 
@@ -148,6 +174,8 @@ class ListeningModeManager:
                     if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
                         logger.info(f"对话模式空闲超过{self.dialogue_idle_timeout}秒，自动切回监听模式")
                         self.mode = "listening"
+                        # 通知前端模式切换
+                        self._notify_mode_change("listening", "idle_timeout")
 
     def _check_trigger_summary_locked(self):
         """检查是否满足触发总结的条件（定时或定量）"""

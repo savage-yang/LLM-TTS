@@ -127,6 +127,7 @@ class Robot(ABC):
         self.stop_event = threading.Event()
 
         self.callback = None
+        self.event_callback = None  # WebSocket 事件回调：async fn(event: dict)
 
         self.speech = []
 
@@ -343,6 +344,8 @@ class Robot(ABC):
 
         processed_text, is_wake_transition = self.listening_manager.process_asr_result(text, start_time, end_time)
 
+        # 模式切换通知已由 ListeningModeManager._notify_mode_change 处理，无需重复发送
+
         if processed_text is not None and processed_text.strip():
             asr_real = (t_asr_done - t_asr_call) * 1000
             logger.info(f"[耗时] ASR识别完成: {processed_text[:20]}... | ASR耗时: {asr_real:.0f}ms")
@@ -352,6 +355,17 @@ class Robot(ABC):
                 return
             if self.callback:
                 self.callback({"role": "user", "content": str(processed_text)})
+            if self.event_callback:
+                try:
+                    import asyncio as _asyncio
+                    loop = _asyncio.get_event_loop()
+                    if loop.is_running():
+                        _asyncio.run_coroutine_threadsafe(
+                            self.event_callback({"type": "user_text", "content": str(processed_text)}),
+                            loop
+                        )
+                except Exception:
+                    pass
             self._submit_chat(processed_text, play_wakeup=is_wake_transition)
         else:
             logger.debug(f"ASR识别结果(监听模式): {text}")
@@ -583,6 +597,19 @@ class Robot(ABC):
 
         self._chat_reset_tts()
 
+        # 通知前端 TTS 开始
+        if self.event_callback:
+            try:
+                import asyncio as _asyncio
+                _loop = _asyncio.get_event_loop()
+                if _loop.is_running():
+                    _asyncio.run_coroutine_threadsafe(
+                        self.event_callback({"type": "tts_start", "sentenceId": 0}),
+                        _loop
+                    )
+            except Exception:
+                pass
+
         response_message = []
         need_exit = False
         need_switch_listen = False
@@ -615,8 +642,32 @@ class Robot(ABC):
                 response_message.append(content)
                 logger.debug(f"收到LLM token: {content}")
                 self._chat_handle_token(content)
+                if self.event_callback:
+                    try:
+                        import asyncio as _asyncio
+                        _loop = _asyncio.get_event_loop()
+                        if _loop.is_running():
+                            _asyncio.run_coroutine_threadsafe(
+                                self.event_callback({"type": "llm_token", "content": content}),
+                                _loop
+                            )
+                    except Exception:
+                        pass
 
         self._chat_flush_tts()
+
+        # 通知前端 TTS 结束
+        if self.event_callback:
+            try:
+                import asyncio as _asyncio
+                _loop = _asyncio.get_event_loop()
+                if _loop.is_running():
+                    _asyncio.run_coroutine_threadsafe(
+                        self.event_callback({"type": "tts_end", "sentenceId": 0}),
+                        _loop
+                    )
+            except Exception:
+                pass
 
         t_llm_done = time.time()
         if t_first_token:
@@ -744,6 +795,26 @@ class Robot(ABC):
 # StreamRobot：流式 TTS 机器人（QwenTtsRealtimeAPI）
 # ============================================================
 class StreamRobot(Robot):
+    def __init__(self, config: str, websocket=None, loop=None):
+        super().__init__(config)
+        self._ws_mode = websocket is not None
+        if self._ws_mode:
+            from bailing.recorder import WebSocketRecorder
+            from bailing.player import WebSocketStreamPlayer
+            from bailing.utils import read_config
+            config_dict = read_config(config)
+            self.recorder = WebSocketRecorder({})
+            tts_module = config_dict["selected_module"]["TTS"]
+            tts_cfg = config_dict["TTS"].get(tts_module, {})
+            ws_player = WebSocketStreamPlayer(tts_cfg)
+            ws_player.init(websocket, loop)
+            self.stream_player = ws_player
+            self.player = ws_player
+            # 同步更新 TTS stream 的 player 引用（_init_tts_specific 已创建）
+            if self.current_tts_stream:
+                self.current_tts_stream.stream_player = ws_player
+                self.current_tts_stream.callback.player = ws_player
+
     def _init_tts_specific(self, config: Dict[str, Any]) -> None:
         self.stream_player: Optional[PygameStreamPlayer] = None
         self.stream_tts_config: Optional[Dict[str, Any]] = None

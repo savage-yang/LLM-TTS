@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import platform
 import queue
@@ -12,6 +13,7 @@ import time
 import pyaudio
 import io
 from typing import Dict, Any, Optional, Tuple
+from starlette.websockets import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +373,182 @@ class PygameStreamPlayer(AbstractPlayer):
             logger.debug(f"播放完成：{audio_file}")
         except Exception as e:
             logger.error(f"播放音频失败: {e}")
+
+
+class WebSocketPlayer(AbstractPlayer):
+    """通过WebSocket发送音频到前端"""
+
+    def __init__(self, *args, **kwargs):
+        super(WebSocketPlayer, self).__init__(*args, **kwargs)
+
+        self.websocket = None
+        self.loop = None
+        self.playing_status = False
+        self.lock = threading.Lock()  # 添加线程锁
+
+    def init(self, websocket: WebSocket, loop):
+        self.websocket = websocket
+        self.loop = loop
+
+    def get_playing_status(self):
+        """正在播放和队列非空，为正在播放状态"""
+        return self.playing_status
+
+    def set_playing_status(self, status):
+        """正在播放和队列非空，为正在播放状态"""
+        self.playing_status = status
+
+    def do_playing(self, audio_file):
+        try:
+            with open(audio_file, "rb") as f:
+                wav_data = f.read()
+            logger.info(f"websocket 发送音频文件：{audio_file}")
+
+            asyncio.run_coroutine_threadsafe(
+                self.websocket.send_bytes(wav_data),
+                self.loop
+            )
+
+        except Exception as e:
+            logger.error(f"播放音频失败: {e}")
+
+    def interrupt(self):
+        """异步发送中断命令"""
+        try:
+            if self.websocket and self.websocket.client_state.value == 1:  # 1 = CONNECTED
+                asyncio.run_coroutine_threadsafe(
+                    self.websocket.send_text(json.dumps({"type": "interrupt"})),
+                    self.loop
+                )
+            else:
+                logger.warning("尝试中断时 WebSocket 未连接")
+        except Exception as e:
+            logger.error(f"发送中断命令失败: {e}")
+
+    def send_messages(self, messages):
+        logger.info(f"send_messages: {messages}")
+        if not self.websocket or self.websocket.client_state.value != 1:  # 1 = CONNECTED
+            logger.warning("发送消息时 WebSocket 未连接")
+            return
+
+        data = {
+            "type": "update_dialogue",
+            "data": messages if isinstance(messages, list) else [messages]
+        }
+        try:
+            asyncio.run_coroutine_threadsafe(
+                self.websocket.send_text(json.dumps(data)),
+                self.loop
+            )
+        except Exception as e:
+            logger.error(f"发送消息失败: {e}")
+
+    def stop(self):
+        """停止播放器"""
+        try:
+            if self.websocket and self.websocket.client_state.value == 1:  # 1 = CONNECTED
+                asyncio.run_coroutine_threadsafe(
+                    self.websocket.send_text(json.dumps({"type": "interrupt"})),
+                    self.loop
+                )
+            #     await self.websocket.send_text(json.dumps({"type": "interrupt"}))
+            #     # 关闭连接
+            #     await self.websocket.close()
+            # self.websocket = None
+        except Exception as e:
+            logger.error(f"停止播放器失败: {e}")
+
+
+class WebSocketStreamPlayer(AbstractPlayer):
+    """WebSocket 流式播放器：将 TTS PCM 音频发送到前端，替代 PygameStreamPlayer"""
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None, *args: Any, **kwargs: Any):
+        super(WebSocketStreamPlayer, self).__init__(*args, **kwargs)
+        self.websocket = None
+        self.loop = None
+        self._playing = False
+        self.sentence_id = 0
+
+    def init(self, websocket, loop):
+        self.websocket = websocket
+        self.loop = loop
+
+    def feed_audio(self, audio_data: bytes) -> None:
+        """将 PCM 音频块发送到前端（base64 编码）"""
+        if not self.websocket or self.websocket.client_state.value != 1:
+            return
+        self._playing = True
+        try:
+            import base64 as _b64
+            asyncio.run_coroutine_threadsafe(
+                self.websocket.send_json({
+                    "type": "tts_audio_chunk",
+                    "data": _b64.b64encode(audio_data).decode("ascii"),
+                    "is_last": False,
+                }),
+                self.loop
+            )
+        except Exception as e:
+            logger.error(f"[WSStreamPlayer] 发送音频失败: {e}")
+
+    def get_playing_status(self) -> bool:
+        return self._playing
+
+    def set_playing_status(self, status: bool):
+        self._playing = status
+
+    def interrupt(self):
+        """发送打断命令"""
+        self._playing = False
+        if self.websocket and self.websocket.client_state.value == 1:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    self.websocket.send_text(json.dumps({"type": "interrupt"})),
+                    self.loop
+                )
+            except Exception as e:
+                logger.error(f"[WSStreamPlayer] 发送中断失败: {e}")
+
+    def finish(self) -> None:
+        """发送TTS完成信号"""
+        if not self.websocket or self.websocket.client_state.value != 1:
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(
+                self.websocket.send_json({
+                    "type": "tts_audio_chunk",
+                    "data": "",
+                    "is_last": True,
+                }),
+                self.loop
+            )
+        except Exception as e:
+            logger.error(f"[WSStreamPlayer] 发送完成信号失败: {e}")
+
+    def stop(self):
+        self._playing = False
+        self.clear_buffer()
+
+    def clear_buffer(self):
+        pass
+
+    def do_playing(self, audio_file: str) -> None:
+        """发送 WAV 文件到前端（作为 buffer_audio 类型）"""
+        if not self.websocket or self.websocket.client_state.value != 1:
+            return
+        try:
+            with open(audio_file, "rb") as f:
+                wav_data = f.read()
+            import base64 as _b64
+            asyncio.run_coroutine_threadsafe(
+                self.websocket.send_json({
+                    "type": "buffer_audio",
+                    "data": _b64.b64encode(wav_data).decode("ascii"),
+                }),
+                self.loop
+            )
+        except Exception as e:
+            logger.error(f"[WSStreamPlayer] 发送文件失败: {e}")
 
 
 def create_instance(class_name: str, *args: Any, **kwargs: Any) -> AbstractPlayer:

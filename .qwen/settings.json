@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat *)",
+      "Bash(findstr *)",
+      "Bash(npx *)",
+      "Bash(npm run *)",
+      "Bash(c:/users/36484/conda/envs/bailing/python.exe *)",
+      "Bash(timeout *)",
+      "Bash(type *)",
+      "Bash(dir *)",
+      "Bash(taskkill *)",
+      "Bash(tasklist)",
+      "Bash(python *)",
+      "Bash(conda *)",
+      "Bash(c:\\users\\36484\\conda\\envs\\bailing\\python.exe *)"
+    ]
+  },
+  "$version": 4
+}

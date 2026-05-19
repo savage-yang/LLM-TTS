@@ -14,6 +14,7 @@ interface ChatStore {
   wakeWord: string
   wordCount: number
   lastRecordedText: string
+  llmBubbleText: string
 
   addMessage: (message: Message) => void
   updateLastAssistantMessage: (content: string) => void
@@ -29,6 +30,7 @@ interface ChatStore {
   setSummarizing: (v: boolean) => void
   setTtsSpeaking: (v: boolean) => void
   setWsUrl: (url: string) => void
+  setLlmBubbleText: (text: string) => void
   resetMessages: () => void
 }
 
@@ -41,10 +43,17 @@ export const useChatStore = create<ChatStore>((set) => ({
   isProcessing: false,
   isSummarizing: false,
   isTtsSpeaking: false,
-  wsUrl: "ws://localhost:8765/ws",
+  wsUrl: (() => {
+    const host = window.location.hostname
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "ws://localhost:8765/ws"
+    }
+    return `ws://${host}:8765/ws`
+  })(),
   wakeWord: "小爱",
   wordCount: 0,
   lastRecordedText: "",
+  llmBubbleText: "",
 
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
@@ -80,5 +89,6 @@ export const useChatStore = create<ChatStore>((set) => ({
   setSummarizing: (v) => set({ isSummarizing: v }),
   setTtsSpeaking: (v) => set({ isTtsSpeaking: v }),
   setWsUrl: (url) => set({ wsUrl: url }),
+  setLlmBubbleText: (text) => set({ llmBubbleText: text }),
   resetMessages: () => set({ messages: [] }),
 }))

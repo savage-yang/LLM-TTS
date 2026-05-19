@@ -5,17 +5,49 @@ interface UseMicRecorderProps {
   isConnected: boolean
 }
 
+export type MicStartResult = { ok: true } | { ok: false; reason: string }
+
 export function useSpeechRecognition({ wsRef, isConnected }: UseMicRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
   const manuallyActivatedRef = useRef(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
-  const isSupported = typeof window !== "undefined" && 
-    !!navigator.mediaDevices && !!navigator.mediaDevices.getUserMedia
+  const isSupported =
+    typeof window !== "undefined" &&
+    !!navigator.mediaDevices &&
+    !!navigator.mediaDevices.getUserMedia
 
-  const startRecording = useCallback(async () => {
-    if (!isSupported || !isConnected) return
+  const stopRecording = useCallback(() => {
+    manuallyActivatedRef.current = false
+    if (workletNodeRef.current) {
+      try { workletNodeRef.current.disconnect() } catch {}
+      workletNodeRef.current = null
+    }
+    if (sourceRef.current) {
+      try { sourceRef.current.disconnect() } catch {}
+      sourceRef.current = null
+    }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close() } catch {}
+      audioContextRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    setIsRecording(false)
+  }, [])
+
+  const startRecording = useCallback(async (): Promise<MicStartResult> => {
+    if (!isSupported) {
+      return { ok: false, reason: "浏览器不支持麦克风（请使用 HTTPS 或 localhost 访问）" }
+    }
+    if (!isConnected) {
+      return { ok: false, reason: "后端服务未连接，请检查 web_server.py 是否已启动" }
+    }
 
     try {
       stopRecording()
@@ -32,79 +64,51 @@ export function useSpeechRecognition({ wsRef, isConnected }: UseMicRecorderProps
       streamRef.current = stream
       manuallyActivatedRef.current = true
 
-      let mimeType = ""
-      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        mimeType = "audio/webm;codecs=opus"
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        mimeType = "audio/webm"
-      } else {
-        mimeType = ""
+      // 使用默认采样率（浏览器通常 48kHz），AudioWorklet 内部不做降采样
+      // 后端统一处理采样率
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+
+      // 等待 AudioContext ready
+      if (audioContext.state === "suspended") {
+        await audioContext.resume()
       }
 
-      const recorder = new MediaRecorder(stream, {
-        mimeType: mimeType || undefined,
-      })
+      // 加载 AudioWorklet processor
+      await audioContext.audioWorklet.addModule("/pcm-processor.js")
 
-      recorder.onstart = () => {
-        setIsRecording(true)
-      }
+      const workletNode = new AudioWorkletNode(audioContext, "pcm-processor")
+      workletNodeRef.current = workletNode
 
-      recorder.onstop = () => {
-        setIsRecording(false)
-        if (manuallyActivatedRef.current && streamRef.current && streamRef.current.active) {
-          setTimeout(() => {
-            try {
-              if (recorder.state === "inactive") {
-                recorder.start(200)
-              }
-            } catch {}
-          }, 300)
+      const source = audioContext.createMediaStreamSource(stream)
+      sourceRef.current = source
+
+      console.log(`AudioContext sample rate: ${audioContext.sampleRate}Hz`)
+
+      workletNode.port.onmessage = (event) => {
+        if (!manuallyActivatedRef.current) return
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+
+        const pcmBuffer = event.data as ArrayBuffer
+        try {
+          wsRef.current.send(pcmBuffer)
+        } catch (e) {
+          console.warn("Send PCM failed:", e)
         }
       }
 
-      recorder.onerror = (event) => {
-        console.error("MediaRecorder error:", event.error)
-        setIsRecording(false)
-      }
+      // 只连接 source → workletNode，不连接 destination，不会产生回放
+      source.connect(workletNode)
 
-      recorder.ondataavailable = (event) => {
-        if (!event.data || event.data.size === 0) return
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-
-        event.data.arrayBuffer().then((arrayBuffer) => {
-          try {
-            wsRef.current.send(arrayBuffer)
-          } catch (e) {
-            console.warn("Send audio chunk failed:", e)
-          }
-        })
-      }
-
-      mediaRecorderRef.current = recorder
-      recorder.start(200)
-
+      setIsRecording(true)
+      return { ok: true }
     } catch (e) {
       console.error("Failed to start recording:", e)
       setIsRecording(false)
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, reason: `麦克风启动失败: ${msg}` }
     }
-  }, [isSupported, isConnected])
-
-  const stopRecording = useCallback(() => {
-    manuallyActivatedRef.current = false
-    if (mediaRecorderRef.current) {
-      try {
-        if (mediaRecorderRef.current.state === "recording") {
-          mediaRecorderRef.current.stop()
-        }
-      } catch {}
-      mediaRecorderRef.current = null
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-    }
-    setIsRecording(false)
-  }, [])
+  }, [isSupported, isConnected, stopRecording])
 
   return {
     isSupported,

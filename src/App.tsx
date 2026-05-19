@@ -4,6 +4,7 @@ import { AiCharacter } from "@/components/AiCharacter/AiCharacter"
 import { ChatPanel } from "@/components/Chat/ChatPanel"
 import { ModeIndicator } from "@/components/ModeIndicator/ModeIndicator"
 import { SettingsPanel } from "@/components/Settings/SettingsPanel"
+import { SpeechBubble } from "@/components/SpeechBubble/SpeechBubble"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
@@ -14,6 +15,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
+  const [micError, setMicError] = useState<string | null>(null)
 
   const { isSupported: audioSupported, appendChunk: onTtsChunk, resetChunks: onTtsStart, stop: stopTts } = useAudioPlayer()
   const { connect, disconnect, sendMessage, switchMode, isConnected, wsRef } = useWebSocket({
@@ -39,8 +41,13 @@ function App() {
 
   const handleActivateMic = useCallback(async () => {
     if (!micSupported) return
-    await startRecording()
-    setMicEnabled(true)
+    setMicError(null)
+    const result = await startRecording()
+    if (result.ok === true) {
+      setMicEnabled(true)
+    } else {
+      setMicError(result.reason)
+    }
   }, [micSupported, startRecording])
 
   useEffect(() => {
@@ -93,6 +100,9 @@ function App() {
 
         {/* Character */}
         <AiCharacter />
+
+        {/* Speech Bubble - LLM 回复显示 */}
+        <SpeechBubble />
 
         {/* Mode indicator */}
         <div className="mt-3 mb-8">
@@ -170,6 +180,18 @@ function App() {
                 ? "正在思考回复..."
                 : "对话模式中，可以直接说话或点击右下角查看消息记录"}
         </p>
+
+        {/* Mic error toast */}
+        {micError && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-4 max-w-lg mx-auto px-5 py-3 rounded-xl bg-red-500/15 border border-red-400/25 text-red-300/90 text-sm text-center"
+          >
+            {micError}
+          </motion.div>
+        )}
       </div>
 
       {/* Bottom bar */}
@@ -177,36 +199,36 @@ function App() {
         <div className="max-w-lg mx-auto flex items-center justify-between px-10">
           <button
             onClick={() => !isConnected && connect()}
-            className={`p-3 rounded-full transition-all duration-300 ${
+            className={`p-4 rounded-full transition-all duration-300 ${
               isConnected
                 ? "text-emerald-400/60"
                 : "text-white/30 hover:text-white/55 hover:bg-white/[0.06]"
             }`}
             title={isConnected ? "已连接" : "重新连接"}
           >
-            {isConnected ? <Wifi size={22} /> : <WifiOff size={22} />}
+            {isConnected ? <Wifi size={28} /> : <WifiOff size={28} />}
           </button>
 
           <button
             onClick={() => setChatOpen(!chatOpen)}
-            className={`p-3 rounded-full transition-all duration-300 ${
+            className={`p-4 rounded-full transition-all duration-300 ${
               chatOpen
                 ? "text-blue-300/90 bg-blue-400/[0.12]"
-                : "text-white/32 hover:text-white/60 hover:bg-white/[0.06]"
+                : "text-white/70 hover:text-white/90 hover:bg-white/[0.08]"
             }`}
             title="查看对话记录"
           >
-            <MessageSquare size={22} />
+            <MessageSquare size={28} />
           </button>
 
           <button
             onClick={() => setSettingsOpen(true)}
-            className="p-3 rounded-full text-white/30 
+            className="p-4 rounded-full text-white/30
               hover:text-white/55 hover:bg-white/[0.06]
               transition-all duration-200"
             title="设置"
           >
-            <Settings size={22} />
+            <Settings size={28} />
           </button>
         </div>
       </div>
@@ -227,8 +249,8 @@ function App() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 w-full max-w-md z-50 
-                bg-[#1c2538]/97 backdrop-blur-xl border-l border-white/[0.10] 
+              className="fixed top-0 right-0 bottom-0 w-full max-w-md z-50
+                bg-[#1c2538]/97 backdrop-blur-xl border-l border-white/[0.10]
                 shadow-2xl flex flex-col overflow-hidden"
             >
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.09]">

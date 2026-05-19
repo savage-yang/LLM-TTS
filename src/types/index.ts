@@ -35,6 +35,8 @@ export type ServerMessageType =
   | "tts_audio_chunk"
   | "tts_end"
   | "tts_error"
+  | "buffer_audio"
+  | "llm_token"
 
 export interface ServerMessage {
   type: ServerMessageType
@@ -56,6 +58,7 @@ export interface ServerMessage {
   data?: string
   is_last?: boolean
   error?: string
+  modules_loaded?: boolean
 }
 
 export interface ClientMessage {

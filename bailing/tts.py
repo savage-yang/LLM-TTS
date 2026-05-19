@@ -182,16 +182,16 @@ class QwenTtsRealtimeStream:
                 self.player = player
                 self.complete_event = threading.Event()
                 self.is_connected = False  # 自己维护连接状态，避免依赖客户端内部状态误判
-            
+
             def on_open(self) -> None:
                 logger.debug("[QwenTtsStream] 连接已建立")
                 self.is_connected = True
-            
+
             def on_close(self, close_status_code, close_msg) -> None:
                 logger.debug(f"[QwenTtsStream] 连接关闭 code={close_status_code}, msg={close_msg}")
                 self.is_connected = False
                 self.complete_event.set()
-            
+
             def on_event(self, response: dict) -> None:
                 try:
                     event_type = response.get('type', '')
@@ -201,6 +201,9 @@ class QwenTtsRealtimeStream:
                         self.player.feed_audio(audio_data)
                     elif event_type == 'session.finished':
                         logger.debug("[QwenTtsStream] 音频生成完成")
+                        # 发送完成信号到前端
+                        if hasattr(self.player, 'finish'):
+                            self.player.finish()
                         self.complete_event.set()
                     elif 'error' in response or event_type == 'error':
                         # 收到错误信息也直接结束会话，避免卡死
