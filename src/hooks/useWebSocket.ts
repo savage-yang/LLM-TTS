@@ -80,7 +80,10 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                   setMouthOpen(false)
                 } else if (data.mode === "dialogue") {
                   setCharacterEmotion(data.reason === "wake_word" ? "happy" : "idle")
+<<<<<<< HEAD
                   setMouthOpen(false)
+=======
+>>>>>>> ad5a09d (UI)
                   setLastDialogueTime(Date.now())
                 }
               }
@@ -131,10 +134,16 @@ export function useWebSocket(options?: UseWebSocketOptions) {
                 setCharacterEmotion("idle")
                 setIsInterrupted(true)
               } else {
+<<<<<<< HEAD
                 // 无论是否收到音频，都重置状态
                 setTtsSpeaking(false)
                 setMouthOpen(false)
                 if (!hasReceivedAudioRef.current) {
+=======
+                if (!hasReceivedAudioRef.current) {
+                  setTtsSpeaking(false)
+                  setMouthOpen(false)
+>>>>>>> ad5a09d (UI)
                   setCharacterEmotion("happy")
                 }
                 setTimeout(() => {
