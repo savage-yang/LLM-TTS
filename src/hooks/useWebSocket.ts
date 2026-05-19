@@ -119,14 +119,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               }
               break
 
-            case "tts_start":
-              hasReceivedAudioRef.current = false
-              setIsInterrupted(false)
-              setTtsSpeaking(true)
-              setCharacterEmotion("speaking")
-              optionsRef.current?.onTtsStart?.()
-              break
-
             case "tts_audio_chunk":
               if (data.data && data.is_last !== undefined) {
                 hasReceivedAudioRef.current = true
