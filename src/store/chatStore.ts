@@ -1,9 +1,8 @@
 import { create } from "zustand"
-import type { Message, EmotionType, CharacterState, AppMode, SummaryItem } from "@/types"
+import type { Message, EmotionType, CharacterState, AppMode } from "@/types"
 
 interface ChatStore {
   messages: Message[]
-  summaries: SummaryItem[]
   characterState: CharacterState
   mode: AppMode
   isConnected: boolean
@@ -26,7 +25,6 @@ interface ChatStore {
   setWakeWord: (word: string) => void
   setWordCount: (count: number) => void
   setLastRecordedText: (text: string) => void
-  addSummary: (summary: SummaryItem) => void
   setSummarizing: (v: boolean) => void
   setTtsSpeaking: (v: boolean) => void
   setWsUrl: (url: string) => void
@@ -36,7 +34,6 @@ interface ChatStore {
 
 export const useChatStore = create<ChatStore>((set) => ({
   messages: [],
-  summaries: [],
   characterState: { emotion: "idle", isMouthOpen: false },
   mode: "listening",
   isConnected: false,
@@ -84,8 +81,6 @@ export const useChatStore = create<ChatStore>((set) => ({
   setWakeWord: (word) => set({ wakeWord: word }),
   setWordCount: (count) => set({ wordCount: count }),
   setLastRecordedText: (text) => set({ lastRecordedText: text }),
-  addSummary: (summary) =>
-    set((state) => ({ summaries: [summary, ...state.summaries] })),
   setSummarizing: (v) => set({ isSummarizing: v }),
   setTtsSpeaking: (v) => set({ isTtsSpeaking: v }),
   setWsUrl: (url) => set({ wsUrl: url }),

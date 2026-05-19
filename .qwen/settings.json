@@ -13,7 +13,8 @@
       "Bash(tasklist)",
       "Bash(python *)",
       "Bash(conda *)",
-      "Bash(c:\\users\\36484\\conda\\envs\\bailing\\python.exe *)"
+      "Bash(c:\\users\\36484\\conda\\envs\\bailing\\python.exe *)",
+      "Bash(ipconfig)"
     ]
   },
   "$version": 4

@@ -28,7 +28,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     setWakeWord,
     setWordCount,
     setLastRecordedText,
-    addSummary,
     setSummarizing,
     setTtsSpeaking,
   } = useChatStore()
@@ -63,11 +62,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
 
           switch (data.type) {
             case "connected":
-              if (data.mode) setMode(data.mode)
-              if (data.wake_word) setWakeWord(data.wake_word)
-              if (data.word_count !== undefined) setWordCount(data.word_count)
-              break
-
             case "status":
               if (data.mode) setMode(data.mode)
               if (data.wake_word) setWakeWord(data.wake_word)
@@ -90,21 +84,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               if (data.word_count !== undefined) setWordCount(data.word_count)
               if (data.text) setLastRecordedText(data.text)
               if (data.summarizing) setSummarizing(true)
-              break
-
-            case "summary_start":
-              setSummarizing(true)
-              break
-
-            case "summary":
-              if (data.content && data.timestamp) {
-                addSummary({
-                  id: crypto.randomUUID(),
-                  content: data.content,
-                  timestamp: data.timestamp,
-                })
-              }
-              setSummarizing(false)
               break
 
             case "tts_start":
@@ -140,26 +119,6 @@ export function useWebSocket(options?: UseWebSocketOptions) {
               setCharacterEmotion("idle")
               console.error("TTS error:", data.error)
               break
-
-            case "buffer_audio": {
-              // 缓冲音效：base64 编码的 WAV 文件，直接解码播放
-              if (data.data) {
-                try {
-                  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-                  const raw = atob(data.data)
-                  const bytes = new Uint8Array(raw.length)
-                  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
-                  audioCtx.decodeAudioData(bytes.buffer).then((audioBuffer) => {
-                    const source = audioCtx.createBufferSource()
-                    source.buffer = audioBuffer
-                    source.connect(audioCtx.destination)
-                    source.start()
-                    source.onended = () => audioCtx.close()
-                  }).catch(() => audioCtx.close())
-                } catch {}
-              }
-              break
-            }
 
             case "llm_token": {
               // LLM 流式 token：实时显示生成中的文本

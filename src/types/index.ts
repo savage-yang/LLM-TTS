@@ -12,12 +12,6 @@ export interface Message {
   emotion?: EmotionType
 }
 
-export interface SummaryItem {
-  id: string
-  content: string
-  timestamp: string
-}
-
 export interface CharacterState {
   emotion: EmotionType
   isMouthOpen: boolean
@@ -28,14 +22,11 @@ export type ServerMessageType =
   | "connected"
   | "mode_change"
   | "listening_recorded"
-  | "summary_start"
-  | "summary"
   | "status"
   | "tts_start"
   | "tts_audio_chunk"
   | "tts_end"
   | "tts_error"
-  | "buffer_audio"
   | "llm_token"
 
 export interface ServerMessage {

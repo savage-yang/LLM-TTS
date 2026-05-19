@@ -5,15 +5,17 @@ import { ChatPanel } from "@/components/Chat/ChatPanel"
 import { ModeIndicator } from "@/components/ModeIndicator/ModeIndicator"
 import { SettingsPanel } from "@/components/Settings/SettingsPanel"
 import { SpeechBubble } from "@/components/SpeechBubble/SpeechBubble"
+import { ListeningSummaryPanel } from "@/components/ListeningSummary/ListeningSummaryPanel"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { useChatStore } from "@/store/chatStore"
-import { Wifi, WifiOff, Settings, MessageSquare, X, Mic } from "lucide-react"
+import { Wifi, WifiOff, Settings, MessageSquare, ScrollText, X, Mic } from "lucide-react"
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
   const [micError, setMicError] = useState<string | null>(null)
 
@@ -45,10 +47,27 @@ function App() {
     const result = await startRecording()
     if (result.ok === true) {
       setMicEnabled(true)
+      playPrologue()
     } else {
       setMicError(result.reason)
     }
   }, [micSupported, startRecording])
+
+  const playPrologue = useCallback(async () => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:8765/api/prologue`)
+      if (!res.ok) return
+      const blob = await res.blob()
+      const arrayBuffer = await blob.arrayBuffer()
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      if (ctx.state === "suspended") ctx.resume()
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+      const source = ctx.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(ctx.destination)
+      source.start(0)
+    } catch {}
+  }, [])
 
   useEffect(() => {
     if (!isConnected && micEnabled) {
@@ -56,13 +75,6 @@ function App() {
       setMicEnabled(false)
     }
   }, [isConnected])
-
-  const handleSend = (content: string) => {
-    if (isTtsSpeaking) {
-      stopTts()
-    }
-    sendMessage(content)
-  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#1a2234] font-['Nunito',sans-serif] overflow-hidden relative">
@@ -222,6 +234,18 @@ function App() {
           </button>
 
           <button
+            onClick={() => { setSummaryOpen(!summaryOpen); setChatOpen(false); }}
+            className={`p-4 rounded-full transition-all duration-300 ${
+              summaryOpen
+                ? "text-blue-300/90 bg-blue-400/[0.12]"
+                : "text-white/70 hover:text-white/90 hover:bg-white/[0.08]"
+            }`}
+            title="查看监听记录"
+          >
+            <ScrollText size={28} />
+          </button>
+
+          <button
             onClick={() => setSettingsOpen(true)}
             className="p-4 rounded-full text-white/30
               hover:text-white/55 hover:bg-white/[0.06]
@@ -264,6 +288,43 @@ function App() {
               </div>
               <div className="flex-1 min-h-0">
                 <ChatPanel />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Listening summary overlay panel */}
+      <AnimatePresence>
+        {summaryOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+              onClick={() => setSummaryOpen(false)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-md z-50
+                bg-[#1c2538]/97 backdrop-blur-xl border-l border-white/[0.10]
+                shadow-2xl flex flex-col overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.09]">
+                <h3 className="text-lg font-semibold text-white/75">监听记录</h3>
+                <button
+                  onClick={() => setSummaryOpen(false)}
+                  className="p-2 rounded-lg text-white/40 hover:text-white/65 hover:bg-white/[0.07] transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0">
+                <ListeningSummaryPanel />
               </div>
             </motion.div>
           </>

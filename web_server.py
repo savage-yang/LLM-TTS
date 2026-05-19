@@ -16,24 +16,28 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from bailing.robot import create_robot
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # ============================================================
 # 日志配置
 # ============================================================
 def setup_logging(config_path: str = "config/config.yaml") -> None:
-    import yaml
     log_level = logging.INFO
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(os.path.join(BASE_DIR, config_path), 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
             level_str = config.get('logging', {}).get('level', 'INFO').upper()
             level_map = {
@@ -83,18 +87,82 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+assets_dir = os.path.join(BASE_DIR, "assets")
 if os.path.isdir(assets_dir):
     app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-_config_path: Optional[str] = None
+_config_path = os.path.join(BASE_DIR, "config", "config.yaml")
 
 
 @app.on_event("startup")
 def on_startup():
-    global _config_path
-    _config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "config.yaml")
     logger.info(f"配置路径: {_config_path}")
+
+
+# ============================================================
+# 总结文件解析
+# ============================================================
+def _parse_summary_files(summary_dir: str) -> list[dict]:
+    summaries = []
+    if not os.path.isdir(summary_dir):
+        return summaries
+    for fname in sorted(os.listdir(summary_dir)):
+        if not (fname.startswith("summary-") and fname.endswith(".txt")):
+            continue
+        filepath = os.path.join(summary_dir, fname)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            blocks = content.split("=" * 50)
+            for block in blocks:
+                block = block.strip()
+                if not block:
+                    continue
+                lines = block.split("\n")
+                ts = ""
+                text_lines = []
+                for line in lines:
+                    if line.startswith("总结时间: "):
+                        ts = line.replace("总结时间: ", "").strip()
+                    elif not line.startswith("原始内容字数"):
+                        text_lines.append(line)
+                text = "\n".join(text_lines).strip()
+                if text:
+                    summaries.append({"content": text, "timestamp": ts})
+        except Exception as e:
+            logger.warning(f"读取总结文件失败 {fname}: {e}")
+    return summaries
+
+
+# ============================================================
+# REST API 端点
+# ============================================================
+@app.get("/api/listening-summaries")
+def get_listening_summaries():
+    try:
+        with open(_config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        listening_cfg = config.get("ListeningMode", {})
+        summary_interval = listening_cfg.get("summary_interval", 60)
+        summary_dir = listening_cfg.get("summary_save_path", "./tmp/listening_summaries")
+    except Exception:
+        summary_interval = 60
+        summary_dir = "./tmp/listening_summaries"
+
+    summary_dir = os.path.join(BASE_DIR, summary_dir)
+    summaries = _parse_summary_files(summary_dir)
+
+    return {"summaries": summaries, "summary_interval": summary_interval}
+
+
+@app.get("/api/prologue")
+def get_prologue():
+    prologue_path = os.path.join(BASE_DIR, "voice_cache", "prologue.wav")
+    if os.path.exists(prologue_path):
+        logger.info("正在返回启动音效文件")
+        return FileResponse(prologue_path, media_type="audio/wav")
+    logger.warning("启动音效文件不存在：voice_cache/prologue.wav")
+    return {"error": "not found"}
 
 
 # ============================================================
@@ -109,21 +177,17 @@ async def websocket_endpoint(ws: WebSocket):
 
     robot = None
     try:
-        # 一行创建，WebSocket 模式自动生效
         robot = create_robot(_config_path, websocket=ws, loop=loop)
 
-        # 设置 WebSocket 事件回调，用于发送 TTS 状态等事件到前端
         async def event_callback(event: dict):
             try:
                 await ws.send_json(event)
             except Exception as e:
                 logger.error(f"发送事件失败: {e}")
         robot.event_callback = event_callback
-        # 同步更新监听模式管理器的事件回调和事件循环
         robot.listening_manager.event_callback = event_callback
         robot.listening_manager._event_loop = loop
 
-        # 设置对话消息回调，将 user/assistant 消息发送到前端
         def dialogue_callback(msg: dict):
             role = msg.get("role", "")
             content = msg.get("content", "")
@@ -144,7 +208,6 @@ async def websocket_endpoint(ws: WebSocket):
                 logger.error(f"发送对话消息失败: {e}")
         robot.callback = dialogue_callback
 
-        # 发送初始状态（与后端 ListeningModeManager 的默认模式保持一致）
         await ws.send_json({
             "type": "status",
             "mode": "listening",
@@ -152,13 +215,12 @@ async def websocket_endpoint(ws: WebSocket):
             "wake_word": "小爱",
             "tts_enabled": True,
             "modules_loaded": True,
+            "summary_interval": robot.listening_manager.summary_interval,
         })
 
-        # 启动录音 + VAD
         robot.start_recording_and_vad()
         logger.info(f"🤖 [#{client_id}] Robot 已启动 (WebSocket 模式)")
 
-        # 后台运行 _duplex 循环
         def run_duplex():
             try:
                 while not robot.stop_event.is_set():
@@ -169,14 +231,12 @@ async def websocket_endpoint(ws: WebSocket):
 
         threading.Thread(target=run_duplex, daemon=True).start()
 
-        # 接收 WebSocket 消息
         while True:
             try:
                 msg = await ws.receive()
 
                 if msg["type"] == "websocket.receive":
                     if "bytes" in msg:
-                        # 音频 → Robot
                         robot.recorder.put_audio(msg["bytes"])
                     elif "text" in msg:
                         data = json.loads(msg["text"])
