@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Tuple, List
 import logging
 from datetime import datetime
+import numpy as np
 from funasr import AutoModel
 from funasr.utils.postprocess_utils import rich_transcription_postprocess
 
@@ -71,8 +72,41 @@ class FunASR(ASR):
             vad_kwargs={"max_single_segment_time": 30000},
             disable_update=True,
             hub="hf"
-            # device="cuda:0",  # 如果有GPU，可以解开这行并指定设备
         )
+
+        self._warmup()
+
+    def _warmup(self):
+        """预热ASR模型，触发推理引擎内部懒加载（ONNX Runtime Session创建、JIT编译等）"""
+        try:
+            warmup_file = os.path.join(self.output_dir, ".warmup_silence.wav")
+            self._save_warmup_audio(warmup_file)
+            self.model.generate(
+                input=warmup_file,
+                cache={},
+                language="auto",
+                use_itn=True,
+                batch_size_s=60,
+            )
+            if os.path.exists(warmup_file):
+                os.remove(warmup_file)
+            logger.info("ASR模型预热完成")
+        except Exception as e:
+            logger.warning(f"ASR模型预热失败（不影响正常使用）: {e}")
+
+    @staticmethod
+    def _save_warmup_audio(file_path: str) -> None:
+        """生成100ms静音WAV文件用于预热"""
+        sample_rate = 16000
+        duration_ms = 100
+        num_samples = int(sample_rate * duration_ms / 1000)
+        silence_data = (np.zeros(num_samples, dtype=np.int16)).tobytes()
+
+        with wave.open(file_path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(silence_data)
 
     def recognizer(self, stream_in_audio: List[bytes]) -> Tuple[Optional[str], Optional[str]]:
         """
