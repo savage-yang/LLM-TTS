@@ -8,6 +8,10 @@ import threading
 import uuid
 from abc import ABC, abstractmethod
 import logging
+
+_tools_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools")
+if os.path.isdir(_tools_dir) and _tools_dir not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = _tools_dir + os.pathsep + os.environ.get("PATH", "")
 from concurrent.futures import ThreadPoolExecutor
 import argparse
 import time
