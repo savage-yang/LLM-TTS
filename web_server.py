@@ -110,20 +110,10 @@ def _get_or_create_robot(loop=None):
             return _robot
 
         logger.info("首次连接，创建全局 Robot 实例...")
-        _robot = create_robot(_config_path, websocket=None, loop=loop)
-        _robot.recorder = WebSocketRecorder({})
+        _robot = create_robot(_config_path, websocket=None, loop=loop, ws_mode=True)
 
-        from bailing.player import WebSocketStreamPlayer
-        from bailing.utils import read_config
-        config_dict = read_config(_config_path)
-        tts_module = config_dict["selected_module"]["TTS"]
-        tts_cfg = config_dict["TTS"].get(tts_module, {})
-        ws_player = WebSocketStreamPlayer(tts_cfg)
-        _robot.stream_player = ws_player
-        _robot.player = ws_player
-        if _robot.current_tts_stream:
-            _robot.current_tts_stream.stream_player = ws_player
-            _robot.current_tts_stream.callback.player = ws_player
+        from bailing.recorder import WebSocketRecorder
+        _robot.recorder = WebSocketRecorder({})
 
         async def _event_callback(event: dict):
             with _current_ws_lock:

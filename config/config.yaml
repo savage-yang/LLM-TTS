@@ -82,9 +82,9 @@ Rag:
 Memory:
   dialogue_history_path: tmp/
   memory_file: tmp/memory.json
-  model_name: deepseek-chat
-  url: https://api.deepseek.com
-  api_key: "sk-6c1f8f9020774dda903a836131038034"
+  model_name: qwen3.6-flash
+  url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  api_key: "sk-59dcc22a5a3e427e9c08b5dec7c5faba"
 
 TaskManager:
   functions_call_name: plugins/function_calls_config.json

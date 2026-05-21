@@ -521,6 +521,7 @@ class WebSocketStreamPlayer(AbstractPlayer):
 
     def finish(self) -> None:
         """发送TTS完成信号"""
+        self._playing = False
         self._send_json({
             "type": "tts_audio_chunk",
             "data": "",

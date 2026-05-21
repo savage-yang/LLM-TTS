@@ -256,6 +256,11 @@ class Robot(ABC):
         except Exception as e:
             logger.error(f"记忆更新失败：{e}", exc_info=True)
 
+        if self._ws_mode:
+            logger.info("Web模式：数据已保存，重置会话状态（不关闭进程）")
+            self._reset_for_new_session()
+            return
+
         logger.info("开始关闭其他模块...")
         def _shutdown_worker():
             try:
@@ -295,6 +300,14 @@ class Robot(ABC):
                 os._exit(0)
             except Exception:
                 pass
+
+    def _reset_for_new_session(self) -> None:
+        """Web模式下关闭对话后重置状态，保持进程存活等待下次连接"""
+        self.pending_shutdown = False
+        self.dialogue.reset_for_new_session()
+        self.listening_manager.switch_to_listening()
+        self.interrupt_playback()
+        logger.info("Web模式：会话已重置，等待下次对话")
 
     def start_recording_and_vad(self):
         self.recorder.start_recording(self.audio_queue)
@@ -793,25 +806,15 @@ class Robot(ABC):
 # StreamRobot：流式 TTS 机器人（QwenTtsRealtimeAPI）
 # ============================================================
 class StreamRobot(Robot):
-    def __init__(self, config: str, websocket=None, loop=None):
+    def __init__(self, config: str, websocket=None, loop=None, ws_mode=False):
+        self._ws_mode = ws_mode or (websocket is not None)
         super().__init__(config)
-        self._ws_mode = websocket is not None
+        if websocket is not None:
+            self.stream_player.init(websocket, loop)
+            self.player = self.stream_player
         if self._ws_mode:
             from bailing.recorder import WebSocketRecorder
-            from bailing.player import WebSocketStreamPlayer
-            from bailing.utils import read_config
-            config_dict = read_config(config)
             self.recorder = WebSocketRecorder({})
-            tts_module = config_dict["selected_module"]["TTS"]
-            tts_cfg = config_dict["TTS"].get(tts_module, {})
-            ws_player = WebSocketStreamPlayer(tts_cfg)
-            ws_player.init(websocket, loop)
-            self.stream_player = ws_player
-            self.player = ws_player
-            # 同步更新 TTS stream 的 player 引用（_init_tts_specific 已创建）
-            if self.current_tts_stream:
-                self.current_tts_stream.stream_player = ws_player
-                self.current_tts_stream.callback.player = ws_player
 
     def _init_tts_specific(self, config: Dict[str, Any]) -> None:
         self.stream_player: Optional[PygameStreamPlayer] = None
@@ -828,7 +831,6 @@ class StreamRobot(Robot):
         self._tts_initialized = False
 
         selected_tts = config["selected_module"]["TTS"]
-        self.stream_player = PygameStreamPlayer()
         self.stream_tts_config = config["TTS"][selected_tts]
         self.stream_buffer_duration = self.stream_tts_config.get("stream_buffer_duration", 0.3)
         
@@ -845,10 +847,17 @@ class StreamRobot(Robot):
         self.idle_check_interval = 60  # 空闲检查间隔，单位秒（1分钟）
         self._tts_lock = threading.RLock()  # 保护 current_tts_stream 的读写（可重入，避免同一线程重复申请死锁）
         self._tts_connecting = False  # 预热线程正在建连标志
-        
+
+        if self._ws_mode:
+            from bailing.player import WebSocketStreamPlayer
+            tts_cfg = config["TTS"].get(selected_tts, {})
+            self.stream_player = WebSocketStreamPlayer(tts_cfg)
+        else:
+            self.stream_player = PygameStreamPlayer()
+
         self.current_tts_stream = QwenTtsRealtimeStream(self.stream_tts_config, self.stream_player)
         self._prologue_executor = ThreadPoolExecutor(max_workers=1)
-        logger.info(f"已启用流式TTS模式，首次对话自动建连，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒，空闲超时: {self.idle_timeout}秒")
+        logger.info(f"已启用流式TTS模式，首次缓冲时间: {self.first_buffer_duration}秒，普通缓冲时间: {self.stream_buffer_duration}秒，空闲超时: {self.idle_timeout}秒")
 
     def _tts_priority(self) -> None:
         def shutdown_watcher():
@@ -1348,11 +1357,11 @@ class LocalRobot(Robot):
         return self.executor
 
 
-def create_robot(config_file: str, websocket: Optional[Any] = None, loop: Optional[Any] = None) -> Robot:
+def create_robot(config_file: str, websocket: Optional[Any] = None, loop: Optional[Any] = None, ws_mode: bool = False) -> Robot:
     config = read_config(config_file)
     selected_tts = config["selected_module"]["TTS"]
     if selected_tts == "QwenTtsRealtimeAPI":
-        return StreamRobot(config_file, websocket, loop)
+        return StreamRobot(config_file, websocket, loop, ws_mode=ws_mode)
     else:
         return LocalRobot(config_file, websocket, loop)
 

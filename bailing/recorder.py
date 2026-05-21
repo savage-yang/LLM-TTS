@@ -122,7 +122,6 @@ class WebSocketRecorder(AbstractRecorder):
     def put_audio(self, data: bytes):
         """接收原始 PCM 数据，将其缓冲并分帧后存入 audio_queue"""
         if not self.running:
-            logger.info(f"录音已暂停，丢弃数据")
             return
         # 累积数据
         self._buffer.extend(data)
