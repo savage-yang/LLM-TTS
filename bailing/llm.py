@@ -65,6 +65,22 @@ class OpenAILLM(LLM):
         if enable_thinking is not None:
             self.extra_body["enable_thinking"] = enable_thinking
 
+        self._warmup()
+
+    def _warmup(self):
+        """预热LLM连接，触发HTTP/TLS握手和API服务端冷启动"""
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": "hi"}],
+                stream=False,
+                max_tokens=1,
+                extra_body=self.extra_body,
+            )
+            logger.info(f"LLM预热完成，模型: {self.model_name}")
+        except Exception as e:
+            logger.warning(f"LLM预热失败（不影响正常使用）: {e}")
+
     def response(self, dialogue: List[Dict[str, str]]) -> Generator[str, None, None]:
         try:
             responses = self.client.chat.completions.create(
@@ -119,6 +135,25 @@ class LocalLLM(LLM):
         self.model_name = config.get("model_name", "qwen2.5")
         self.base_url = config.get("url", "http://localhost:11434/api/chat")
         self.api_key = config.get("api_key", None)
+        self._warmup()
+
+    def _warmup(self):
+        """预热本地LLM连接，触发服务端模型加载"""
+        try:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            payload = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": "hi"}],
+                "stream": False,
+                "max_tokens": 1,
+            }
+            resp = requests.post(self.base_url, json=payload, headers=headers, timeout=60)
+            resp.raise_for_status()
+            logger.info(f"本地LLM预热完成，模型: {self.model_name}")
+        except Exception as e:
+            logger.warning(f"本地LLM预热失败（不影响正常使用）: {e}")
 
     def response(self, dialogue: List[Dict[str, str]]) -> Generator[str, None, None]:
         payload = {
