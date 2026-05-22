@@ -1,138 +1,78 @@
-import json
 import logging
-import random
-import time
-import warnings
+import os
+import sys
+from urllib.parse import quote
 
 import requests
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
-
-from plugins.registry import register_function, ToolType
-from plugins.registry import ActionResponse, Action
 
 logger = logging.getLogger(__name__)
 
-class BaseSearch:
+if __name__ != "__main__":
+    from plugins.registry import register_function, ToolType
+    from plugins.registry import ActionResponse, Action
 
-    def __init__(self, topk: int = 3, black_list: list[str] = None):
-        self.topk = topk
-        self.black_list = black_list
-
-    def _filter_results(self, results: list[tuple]) -> dict:
-        filtered_results = {}
-        count = 0
-        for url, snippet, title in results:
-            if all(domain not in url for domain in self.black_list) and not url.endswith('.pdf'):
-                filtered_results[count] = {
-                    'url': url,
-                    'summ': json.dumps(snippet, ensure_ascii=False)[1:-1],
-                    'title': title,
-                }
-                count += 1
-                if count >= self.topk:
-                    break
-        return filtered_results
-
-class DuckDuckGoSearch(BaseSearch):
-
-    def __init__(
-        self,
-        topk: int = 3,
-        black_list: list[str] = [
-            'enoN',
-            'youtube.com',
-            'bilibili.com',
-            'researchgate.net',
-        ],
-        **kwargs,
-    ):
-        self.proxy = kwargs.get('proxy')
-        self.timeout = kwargs.get('timeout', 3000)
-        super().__init__(topk, black_list)
-
-    def search(self, query: str, max_retry: int = 3) -> dict:
-        for attempt in range(max_retry):
-            try:
-                response = self._call_ddgs(query, timeout=self.timeout, proxy=self.proxy)
-                return self._parse_response(response)
-            except Exception as e:
-                logging.exception(str(e))
-                warnings.warn(f'Retry {attempt + 1}/{max_retry} due to error: {e}')
-                time.sleep(random.randint(2, 5))
-        raise Exception('Failed to get search results from DuckDuckGo after retries.')
-
-    # async def asearch(self, query: str, max_retry: int = 3) -> dict:
-    #     for attempt in range(max_retry):
-    #         try:
-    #             ddgs = DDGS(timeout=self.timeout, proxy=self.proxy)
-    #             response = ddgs.text(query.strip("'"), max_results=10)
-    #             return self._parse_response(response)
-    #         except Exception as e:
-    #             if isinstance(e, asyncio.TimeoutError):
-    #                 logging.exception('Request to DDGS timed out.')
-    #             logging.exception(str(e))
-    #             warnings.warn(f'Retry {attempt + 1}/{max_retry} due to error: {e}')
-    #             await asyncio.sleep(random.randint(2, 5))
-    #     raise Exception('Failed to get search results from DuckDuckGo after retries.')
-
-    async def _async_call_ddgs(self, query: str, **kwargs) -> dict:
-        ddgs = DDGS(**kwargs)
-        try:
-            response = await asyncio.wait_for(
-                asyncio.to_thread(ddgs.text, query.strip("'"), max_results=10), timeout=self.timeout
-            )
-            return response
-        except asyncio.TimeoutError:
-            logging.exception('Request to DDGS timed out.')
-            raise
-
-    def _call_ddgs(self, query: str, **kwargs) -> dict:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response = loop.run_until_complete(self._async_call_ddgs(query, **kwargs))
-            return response
-        finally:
-            loop.close()
-
-    def _parse_response(self, response: list[dict]) -> dict:
-        raw_results = []
-        for item in response:
-            raw_results.append(
-                (item['href'], item['description'] if 'description' in item else item['body'], item['title'])
-            )
-        return self._filter_results(raw_results)
+    @register_function('web_search', action=ToolType.TIME_CONSUMING)
+    def web_search(query: str):
+        return _web_search(query)
+else:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+    from plugins.registry import ActionResponse, Action
 
 
-@register_function('web_search', action=ToolType.TIME_CONSUMING)
-def web_search(query, engine="baidu"):
+def _web_search(query: str):
     """
-    在指定的搜索引擎上进行搜索，并返回搜索结果页面的 HTML 内容。
+    搜索互联网信息
 
     Args:
-        query (str): 搜索关键词。
-        engine (str): 指定的搜索引擎，默认为 'google'。可以选择 'baidu'。
+        query: 搜索关键词
 
     Returns:
-        str: 搜索结果页面的 HTML 内容。
+        ActionResponse: 搜索结果
     """
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     }
+    try:
+        url = f'https://www.sogou.com/web?query={quote(query)}'
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return ActionResponse(Action.REQLLM, "搜索失败", None)
 
-    if engine == 'baidu':
-        params = {"wd": query}
-        url = 'https://www.baidu.com/s'
-    else:  # 默认为 Google
-        params = {"q": query}
-        url = 'https://www.google.com/search'
-    logger.debug(f"搜索URL: {url}")
-    # 发送 GET 请求
-    response = requests.get(url, params=params, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
 
-    # 检查请求是否成功
-    if response.status_code == 200:
-        return ActionResponse(Action.REQLLM, response.text, None)
-    else:
+        for item in soup.select('.vrwrap, .rb'):
+            link_tag = item.select_one('h3 a')
+            if not link_tag:
+                continue
+            title = link_tag.get_text(strip=True)
+            if not title or len(title) < 4:
+                continue
+            href = link_tag.get('href', "")
+            abstract_tag = item.select_one('.star-wiki, .str-text, .space-txt')
+            abstract = abstract_tag.get_text(strip=True) if abstract_tag else ""
+            results.append(f"{title}\n{abstract}\n{href}")
+
+        if not results:
+            for tag in soup.find_all(['p', 'h3']):
+                text = tag.get_text(strip=True)
+                if len(text) > 15:
+                    results.append(text)
+
+        content = "\n---\n".join(results[:5]) if results else "未找到相关结果"
+        return ActionResponse(Action.REQLLM, content, None)
+
+    except Exception as e:
+        logger.error(f"搜索出错: {e}")
         return ActionResponse(Action.REQLLM, "搜索失败", None)
+
+
+if __name__ == "__main__":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    rsp = _web_search("全世界有多少个国家")
+    print(f"Action: {rsp.action}")
+    print(f"Result:\n{rsp.result}")
+    print(f"Response: {rsp.response}")

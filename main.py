@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 小爱智能语音助手 - 主程序入口
-@Author: 寒江雪
+@Author: savage
 @Date: 2026-05-09
 """
 

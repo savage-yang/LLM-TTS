@@ -1,6 +1,13 @@
 import logging
+import os
+import sys
 import requests
 from bs4 import BeautifulSoup
+
+# 确保项目根目录在 sys.path 中，支持直接 python xxx.py 运行
+_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 from plugins.registry import register_function, ToolType
 from plugins.registry import ActionResponse, Action

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from plugins.registry import function_registry, Action, ActionResponse, ToolType
 from bailing.utils import read_json_file
-import logging
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # 如果在 plugins/ 中，需要两级 parent
@@ -47,9 +47,6 @@ auto_import_modules('plugins.functions')
 class TaskManager:
     def __init__(self, config, result_queue: queue.Queue):
         self.functions = read_json_file(config.get("functions_call_name", "function_calls_config.json"))
-        aigc_enabled = config.get("aigc_enabled", False)
-        if not aigc_enabled:
-            self.functions = [item for item in self.functions if item["function"]["name"] != 'aigc']
         self.task_queue = queue.Queue()
         # 初始化线程池
         self.task_executor = ThreadPoolExecutor(max_workers=10)
@@ -136,6 +133,3 @@ if __name__ == "__main__":
     a = TaskManager({}, queue.Queue())
     b = a.call_function("get_weather", **{"city": "zhejiang/hangzhou"})
     print(b.action, b.result, b.response)
-
-    rsp = a.call_function("aigc", **{"query": "你可以做什么"})
-    print(rsp.response, rsp.action, rsp.result)

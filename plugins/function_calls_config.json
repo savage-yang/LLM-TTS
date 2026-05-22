@@ -21,41 +21,6 @@
     {
         "type": "function",
         "function": {
-            "name": "ielts_speaking_practice",
-            "description": "提供雅思口语练习的题目和建议，用户可以请求特定主题的练习，例如：'请给我一个旅游主题的雅思口语题",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "topic": {
-                        "type": "string",
-                        "description": "练习主题，例如：旅游、工作、教育等"
-                    }
-                },
-                "required": [
-
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_day_of_week",
-            "description": "获取当前日期的星期几，用户可以询问当前日期或时间，参数为空，因为函数自动获取当前时间",
-            "parameters": {
-                "type": "object",
-                "properties": {
-
-                },
-                "required": [
-
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "schedule_task",
             "description": "创建一个定时任务，用户应提供任务的执行时间和任务内容。\n比如用户说每天早上8点提醒我喝水，参数为：time: '08:00', content: '提醒我喝水'。",
             "parameters": {
@@ -80,55 +45,34 @@
     {
         "type": "function",
         "function": {
-            "name": "open_application",
-            "description": "在 Mac 电脑上打开指定的应用程序，用户应提供应用程序的名称。\n比如用户说打开Safari，参数为：application_name: 'Safari'。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "application_name": {
-                        "type": "string",
-                        "description": "应用程序的名称，比如'Safari'、'Finder'、'Notes'等。"
-                    }
-                },
-                "required": [
-                    "application_name"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_local_documents",
-            "description": "查询本地文档，用户需提供查询关键词，返回匹配的文档列表，例如用户说'查找关于机器学习的文档'，参数为：{'keyword': '机器学习'}",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "keyword": {
-                        "type": "string",
-                        "description": "查询关键词，例如：'机器学习'、'Python编程'等"
-                    }
-                },
-                "required": [
-                    "keyword"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "aigc",
-            "description": "用于解决复杂问题（如系统设计、代码、多步骤推理），调用强大的外部Agent",
+            "name": "web_search",
+            "description": "搜索互联网信息，当用户说'帮我搜一下'、'搜索'、'查一下'时调用",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "用户的复杂问题"
+                        "description": "搜索关键词"
                     }
                 },
                 "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "bark_push",
+            "description": "用结构化内容推送通知到iOS手机（Bark通知服务），内容可包含标题、时间、地点等字段，当用户说'推送这条消息给我'、'推送通知给我'、'发通知'、'手机提醒我'时调用",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "结构化文本内容，支持标题、时间、地点、内容等字段，例如'标题:会议提醒\\n时间:14:00\\n地点:会议室A\\n内容:周会'"
+                    }
+                },
+                "required": ["content"]
             }
         }
     }
