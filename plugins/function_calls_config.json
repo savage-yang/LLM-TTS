@@ -75,5 +75,55 @@
                 "required": ["content"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "todo_write",
+            "description": "任务规划与进度跟踪工具。当用户的需求需要多步完成时，AI自动拆解为任务列表并跟踪执行进度。也支持手动添加、查看、完成任务",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "操作类型: plan(批量创建计划) / start(开始执行) / done(标记完成) / list(查看进度) / abort(中止计划) / add(追加单个任务) / delete(删除任务)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "单个任务内容，action为add时必填"
+                    },
+                    "todo_id": {
+                        "type": "string",
+                        "description": "任务序号（从1开始），action为start/done/delete时必填"
+                    },
+                    "tasks": {
+                        "type": "string",
+                        "description": "任务列表JSON，action为plan时必填。格式: [{\"content\":\"步骤1\",\"priority\":\"high\"},{\"content\":\"步骤2\",\"priority\":\"medium\"}]"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "description": "优先级，可选 high/medium/low，仅action为add时有效，默认medium"
+                    }
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "register_speaker",
+            "description": "注册当前说话人的声纹，当用户说'记住我的声音'、'我叫张三，记住我'、'注册声纹'时调用。调用后会用当前这段语音作为该说话人的声纹样本",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "说话人名称，如'张三'、'老板'、'老婆'"
+                    }
+                },
+                "required": ["name"]
+            }
+        }
     }
 ]

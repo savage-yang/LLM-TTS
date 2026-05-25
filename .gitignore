@@ -7,6 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Node / Web frontend
 node_modules
 dist
 dist-ssr
@@ -22,3 +32,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Runtime data (accumulated during use, not source code)
+tmp/
+
+# Config with secrets (api keys, device tokens) - use config.yaml.example as template
+config/config.yaml
+
+# Environment variables (may contain secrets)
+.env
+config/.env
+
+# Downloaded models (large binary files, not source code)
+models/
+
+# Binary tools
+tools/
+
+# User-specific audio cache
+voice_cache/
+
+# IDE workspace settings
+.qwen/

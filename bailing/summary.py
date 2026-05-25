@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 class SummaryManager:
     """监听内容和总结管理类，管理监听池的收集、存储与总结"""
 
+    _shared_speaker_notes: list[str] = []
+    """类级共享：SPEAKER 处理器写入的人物笔记，所有实例共享"""
+
     def __init__(self, config: Dict[str, Any]):
         """
         初始化总结管理器
@@ -34,6 +37,24 @@ class SummaryManager:
         )
 
         logger.info(f"SummaryManager initialized，保存路径: {self.summary_save_path}")
+
+    @classmethod
+    def add_speaker_note(cls, note: str):
+        """添加人物笔记（由 SPEAKER 处理器调用）"""
+        cls._shared_speaker_notes.append(note)
+        logger.info(f"[人物笔记] {note}")
+
+    @classmethod
+    def get_speaker_notes(cls) -> str:
+        """获取当前所有人物笔记"""
+        if not cls._shared_speaker_notes:
+            return ""
+        return "\n".join(f"[人物] {n}" for n in cls._shared_speaker_notes)
+
+    @classmethod
+    def clear_speaker_notes(cls):
+        """清空人物笔记（总结完成后调用）"""
+        cls._shared_speaker_notes = []
 
     def add_listening_item(self, text: str, start_time: float, end_time: float) -> None:
         """

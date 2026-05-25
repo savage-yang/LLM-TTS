@@ -3,16 +3,24 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 初始化函数注册字典
 function_registry = {}
 
 def register_function(name, action=None):
-    """注册函数到函数注册字典的装饰器"""
     def decorator(func):
         function_registry[name] = func
         if action:
-            func.action = action  # 将 action 属性添加到函数上
+            func.action = action
         logger.info(f"函数 '{name}' 注册成功")
+        return func
+    return decorator
+
+listener_registry = {}
+
+def register_listener(name: str):
+    """注册监听模式处理器的装饰器，name 为特殊 token 名（不含尖括号）"""
+    def decorator(func):
+        listener_registry[name] = func
+        logger.info(f"监听处理器 '{name}' 注册成功")
         return func
     return decorator
 

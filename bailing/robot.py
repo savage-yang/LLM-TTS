@@ -30,6 +30,7 @@ from bailing.utils import read_config, extract_json_from_string
 from bailing.prompt import sys_prompt
 from bailing.listening_mode import ListeningModeManager
 from bailing.bark_notify import BarkNotifier
+from bailing.speaker_diarization import create_instance as create_speaker_diarizer
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,10 @@ class Robot(ABC):
     SWITCH_LISTEN_TOKEN = "<|SWITCH_LISTEN|>"
     PUSH_TOKEN = "<|PUSH_NOTIFICATION|>"
 
+    _instance = None
+
     def __init__(self, config_file: str, websocket: Optional[Any] = None, loop: Optional[Any] = None):
+        Robot._instance = self
         config = read_config(config_file)
         self.audio_queue = queue.Queue()
 
@@ -100,6 +104,20 @@ class Robot(ABC):
 
         # 初始化监听模式管理器
         self.listening_manager = ListeningModeManager(config, self.llm, bark_notifier=self.bark_notifier)
+
+        # 初始化说话人分离模块
+        speaker_config = config.get("SpeakerDiarization", {})
+        if speaker_config.get("enabled", False):
+            t_spk = time.time()
+            self.speaker_diarizer = create_speaker_diarizer(
+                speaker_config.get("class", "FunASRSpeakerDiarizer"),
+                speaker_config
+            )
+            logger.info(f"[启动] 说话人分离模块加载完成，耗时: {time.time()-t_spk:.2f}s")
+        else:
+            from bailing.speaker_diarization import NoOpSpeakerDiarizer
+            self.speaker_diarizer = NoOpSpeakerDiarizer()
+            logger.info("[启动] 说话人分离模块未启用")
 
         logger.info(f"[启动] 所有模块加载完成，总耗时: {time.time()-start_time:.2f}s")
 
@@ -336,7 +354,7 @@ class Robot(ABC):
         threading.Thread(target=self._async_asr_process, args=(voice_data,), daemon=True).start()
 
     def _async_asr_process(self, voice_data):
-        """后台线程：ASR 识别 + 文本处理"""
+        """后台线程：ASR 识别 + 说话人识别 + 文本处理"""
         t_asr_call = time.time()
         try:
             text, tmpfile = self.asr.recognizer(voice_data)
@@ -348,6 +366,18 @@ class Robot(ABC):
         if not text.strip():
             logger.debug("识别结果为空，跳过处理。")
             return
+
+        speaker = None
+        try:
+            speaker = self.speaker_diarizer.identify(voice_data)
+        except Exception as e:
+            logger.debug(f"说话人识别出错（不影响主流程）: {e}")
+
+        if speaker:
+            text = f"{speaker}: {text}"
+
+        from plugins.functions.register_speaker import set_current_audio
+        set_current_audio(voice_data)
 
         now = time.time()
         with self._asr_dedup_lock:
@@ -545,6 +575,9 @@ class Robot(ABC):
                 self._chat_tool_token(result.response)
                 return [result.response]
             elif result.action == Action.REQLLM:
+                if function_name == "todo_write":
+                    logger.info(f"[系统] todo_write 不入对话: {result.result}")
+                    return self.chat_tool(query)
                 self.dialogue.put(Message(role='assistant',
                                           tool_calls=[{"id": function_id, "function": {"arguments": json.dumps(function_arguments, ensure_ascii=False),
                                                                                        "name": function_name},

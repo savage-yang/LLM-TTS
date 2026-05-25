@@ -9,7 +9,7 @@ WakeWord: 小爱
 
 interrupt: true
 # 是否开启工具调用
-StartTaskMode: False
+StartTaskMode: True
 # 具体处理时选择的模块
 selected_module:
   Recorder: RecorderPyAudio
@@ -38,9 +38,9 @@ VAD:
 
 LLM:
   OpenAILLM:
-    model_name: qwen3.6-flash
+    model_name: qwen-flash
     url: https://dashscope.aliyuncs.com/compatible-mode/v1
-    api_key: "sk-59dcc22a5a3e427e9c08b5dec7c5faba"
+    api_key: "YOUR_API_KEY" # 替换为你的阿里云百炼API Key
   LocalLLM:
     # 兼容所有OpenAI格式的本地推理服务：Ollama、vLLM、LM Studio、FastChat、Text Generation WebUI等
     model_name: qwen2.5
@@ -56,7 +56,7 @@ TTS:
     output_dir: tmp/
     dtype: bfloat16
   QwenTtsRealtimeAPI:
-    api_key: "sk-59dcc22a5a3e427e9c08b5dec7c5faba" # 替换成你自己的阿里云百炼API Key
+    api_key: "YOUR_API_KEY" # 替换为你的阿里云百炼API Key
     model: "qwen3-tts-flash-realtime" # 实时版本速度更快，延迟低
     voice: "Cherry" # 官方音色：Cherry/Alvin/Stella/Bella/Molly/Ryan/Stanley/Adam
     url: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime" # 国内节点，新加坡节点用wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime
@@ -77,14 +77,14 @@ Rag:
   emb_model: models/bge-small-zh
   model_name: deepseek-chat
   url: https://api.deepseek.com
-  api_key: "sk-6c1f8f9020774dda903a836131038034"
+  api_key: "YOUR_API_KEY" # 替换为你的DeepSeek或其它供应商API Key
 
 Memory:
   dialogue_history_path: tmp/
   memory_file: tmp/memory.json
-  model_name: qwen3.6-flash
+  model_name: qwen-flash
   url: https://dashscope.aliyuncs.com/compatible-mode/v1
-  api_key: "sk-59dcc22a5a3e427e9c08b5dec7c5faba"
+  api_key: "YOUR_API_KEY" # 替换为你的阿里云百炼API Key
 
 TaskManager:
   functions_call_name: plugins/function_calls_config.json
@@ -110,5 +110,13 @@ ListeningMode:
 # Bark推送配置（iOS推送服务，下载App后填入你的设备Key即可）
 BarkNotify:
   enabled: true
-  device_key: "RvwBvdEmy9ybHxUJ5FJaLZ" # 替换为你的Bark设备Key，从Bark App首页获取
+  device_key: "YOUR_BARK_DEVICE_KEY" # 替换为你的Bark设备Key，从Bark App首页获取
   base_url: "https://api.day.app" # Bark服务器地址
+
+# 说话人分离配置
+SpeakerDiarization:
+  enabled: false # 设为 true 启用说话人分离
+  class: FunASRSpeakerDiarizer
+  model_dir: iic/speech_eres2net_speaker_verification_16k # FunASR声纹嵌入模型
+  similarity_threshold: 0.65 # 声纹相似度阈值，越高越严格
+  max_speakers: 6 # 最大说话人数量

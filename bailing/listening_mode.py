@@ -1,32 +1,40 @@
 import time
 import logging
 import threading
+import importlib
+import pkgutil
 from typing import Dict, Any, Optional
 from bailing.summary import SummaryManager
-from bailing.prompt import listening_summary_prompt
+from bailing.prompt import listening_summary_prompt, listening_analyzer_prompt
+from plugins.registry import listener_registry
 
 logger = logging.getLogger(__name__)
 
 
+def _auto_import_listeners():
+    package = importlib.import_module("plugins.listeners")
+    for importer, modname, ispkg in pkgutil.walk_packages(package.__path__, prefix="plugins.listeners."):
+        try:
+            importlib.import_module(modname)
+        except Exception as e:
+            logger.debug(f"导入监听处理器 {modname} 失败: {e}")
+
+_auto_import_listeners()
+
+
 class ListeningModeManager:
     """
-    监听模式管理器，管理监听模式和对话模式之间的切换，
-    以及监听池的自动总结
+    监听模式管理器
+
+    两种模式：
+    - dialogue（对话模式）：ASR 结果直接提交给 chat_tool，支持全部工具
+    - listening（静默模式）：ASR 结果先由轻量 LLM 分析，检测到重要事件
+      （日程、提醒、新说话人）则触发对应动作，普通内容积累后定时总结
     """
 
     PUSH_TOKEN = "<|PUSH_NOTIFICATION|>"
 
     def __init__(self, config: Dict[str, Any], llm, bark_notifier=None, event_callback=None, event_loop=None):
-        """
-        初始化监听模式管理器
-
-        Args:
-            config: 配置字典，包含 WakeWord 和 ListeningMode 配置
-            llm: LLM 实例，用于生成监听内容总结
-            bark_notifier: BarkNotifier 实例，用于推送重要信息到手机
-            event_callback: WebSocket 事件回调函数
-            event_loop: asyncio 事件循环，用于从后台线程调度异步回调
-        """
         self.config = config
         self.llm = llm
         self.bark_notifier = bark_notifier
@@ -36,12 +44,9 @@ class ListeningModeManager:
 
         self.mode = "listening"
         self.wake_word = config.get("WakeWord", "小爱")
-        # 唤醒词同音字变体（ASR 可能识别为同音不同字）
         self.wake_word_variants = {
             self.wake_word,
-            # 常见误识别
             "小艾", "小暧", "晓爱", "筱爱",
-            # 近音字
             "肖爱", "笑爱", "孝爱"
         }
 
@@ -59,37 +64,26 @@ class ListeningModeManager:
         self._timer_thread = threading.Thread(target=self._summary_timer_loop, daemon=True)
         self._timer_thread.start()
 
-        logger.info(f"ListeningModeManager initialized，初始化完成")
+        logger.info("ListeningModeManager initialized")
 
     def is_listening_mode(self) -> bool:
-        """
-        查询当前是否为监听模式
-
-        Returns:
-            True 表示监听模式，False 表示对话模式
-        """
         with self._lock:
             return self.mode == "listening"
 
     def switch_to_listening(self):
-        """切换到监听模式"""
         with self._lock:
             self.mode = "listening"
         logger.info("切换到监听模式")
-        # 通知前端模式切换
         self._notify_mode_change("listening", "manual")
 
     def switch_to_dialogue(self):
-        """切换到对话模式"""
         with self._lock:
             self.mode = "dialogue"
             self.last_dialogue_time = time.time()
         logger.info("切换到对话模式")
-        # 通知前端模式切换
         self._notify_mode_change("dialogue", "manual")
 
     def _notify_mode_change(self, mode: str, reason: str):
-        """通知前端模式切换"""
         if self.event_callback:
             try:
                 import asyncio as _asyncio
@@ -103,20 +97,10 @@ class ListeningModeManager:
                 logger.debug(f"发送模式切换通知失败: {e}")
 
     def notify_dialogue_activity(self):
-        """标记对话活动，用于检测对话模式空闲超时"""
         with self._lock:
             self.last_dialogue_time = time.time()
 
     def _match_wake_word(self, text: str) -> Optional[str]:
-        """
-        检查文本是否匹配唤醒词（含同音字变体）
-
-        Args:
-            text: 待检查的文本
-
-        Returns:
-            匹配到的变体字符串，未匹配返回 None
-        """
         for variant in self.wake_word_variants:
             if variant in text:
                 return variant
@@ -137,7 +121,6 @@ class ListeningModeManager:
                 self.mode = "dialogue"
                 self.last_dialogue_time = time.time()
                 logger.info("切换到对话模式")
-                # 通知前端模式切换
                 self._notify_mode_change("dialogue", "wake_word")
                 cleaned = text.strip().replace(matched, "").strip()
                 if not cleaned:
@@ -147,14 +130,15 @@ class ListeningModeManager:
 
             self.summary_manager.add_listening_item(text, start_time, end_time)
             self.total_word_count += len(text)
+
             self._check_trigger_summary_locked()
+            self._trigger_listening_analysis(text)
             return None, False
         else:
             current_time = time.time()
             if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
                 logger.info(f"对话模式空闲超过{self.dialogue_idle_timeout}秒，自动切回监听模式")
                 self.mode = "listening"
-                # 通知前端模式切换
                 self._notify_mode_change("listening", "idle_timeout")
                 logger.debug("模式切换时的ASR结果不加入监听池")
                 return None, False
@@ -162,8 +146,58 @@ class ListeningModeManager:
             self.last_dialogue_time = current_time
             return text, False
 
+    def _trigger_listening_analysis(self, text: str):
+        """后台异步分析当前句子，不阻塞主流程"""
+        def _do_analyze():
+            try:
+                result = self._analyze_sentence(text)
+                if result is None:
+                    return
+                token, content = result
+                logger.info(f"[监听分析] 检测到标记: {token} | 内容: {content}")
+                self._dispatch_listener(token, content)
+            except Exception as e:
+                logger.debug(f"监听分析出错（不影响主流程）: {e}")
+
+        threading.Thread(target=_do_analyze, daemon=True).start()
+
+    def _analyze_sentence(self, text: str) -> Optional[tuple[str, str]]:
+        """调用 LLM 分析单句话，输出特殊标记"""
+        try:
+            llm_response = self.llm.response([
+                {"role": "system", "content": listening_analyzer_prompt},
+                {"role": "user", "content": text}
+            ])
+            result = "".join(llm_response).strip()
+            logger.debug(f"[监听分析] LLM返回: {result}")
+
+            if result == "无" or not result:
+                return None
+
+            from plugins.registry import listener_registry
+            for token_name in listener_registry:
+                tag = f"<|{token_name}|>"
+                if tag in result:
+                    content = result.split(tag, 1)[-1].strip()
+                    return token_name, content
+            return None
+        except Exception as e:
+            logger.debug(f"LLM分析调用失败: {e}")
+            return None
+
+    def _dispatch_listener(self, token: str, content: str):
+        """根据特殊 token 路由到对应的监听处理器"""
+        from plugins.registry import listener_registry
+        handler = listener_registry.get(token)
+        if handler:
+            try:
+                handler(content)
+            except Exception as e:
+                logger.error(f"监听处理器 '{token}' 执行失败: {e}")
+        else:
+            logger.warning(f"未注册的监听标记: {token}")
+
     def _summary_timer_loop(self):
-        """后台定时器循环，独立于ASR输入定期检查总结条件和对话空闲超时"""
         while not self._stop_event.is_set():
             self._stop_event.wait(5)
             with self._lock:
@@ -174,11 +208,9 @@ class ListeningModeManager:
                     if current_time - self.last_dialogue_time >= self.dialogue_idle_timeout:
                         logger.info(f"对话模式空闲超过{self.dialogue_idle_timeout}秒，自动切回监听模式")
                         self.mode = "listening"
-                        # 通知前端模式切换
                         self._notify_mode_change("listening", "idle_timeout")
 
     def _check_trigger_summary_locked(self):
-        """检查是否满足触发总结的条件（定时或定量）"""
         if self._summarizing:
             return
         current_time = time.time()
@@ -196,23 +228,23 @@ class ListeningModeManager:
             self.generate_summary()
 
     def generate_summary(self):
-        """
-        调用 LLM 生成监听内容总结
-
-        在后台线程中异步执行，不阻塞主线程
-        """
         raw_text = self.summary_manager.get_raw_text()
         if not raw_text:
             self._summarizing = False
             self.last_summary_time = time.time()
             return
 
+        speaker_notes = self.summary_manager.get_speaker_notes()
+
         def do_summary():
             try:
+                user_content = f"请总结以下内容：\n{raw_text}"
+                if speaker_notes:
+                    user_content = f"对话中涉及以下人物：\n{speaker_notes}\n\n{user_content}"
                 llm_response = self.llm.response(
                     [
                         {"role": "system", "content": listening_summary_prompt},
-                        {"role": "user", "content": f"请总结以下内容：\n{raw_text}"}
+                        {"role": "user", "content": user_content}
                     ]
                 )
                 final_summary = "".join(llm_response)
@@ -226,19 +258,33 @@ class ListeningModeManager:
 
                 if final_summary:
                     self.summary_manager.add_summary(final_summary)
+                    self._sync_to_robot_memory(final_summary)
                 with self._lock:
                     self.total_word_count = 0
                     self.last_summary_time = time.time()
             except Exception as e:
                 logger.error(f"总结失败：{e}")
             finally:
+                self.summary_manager.clear_speaker_notes()
                 with self._lock:
                     self._summarizing = False
 
         threading.Thread(target=do_summary, daemon=True).start()
 
+    def _sync_to_robot_memory(self, summary_text: str):
+        """将监听总结同步到 Robot 的长期记忆"""
+        try:
+            from bailing.robot import Robot
+            from bailing.utils import write_json_file
+            robot = Robot._instance
+            if robot and hasattr(robot, 'memory') and robot.memory:
+                robot.memory.memory["memory"] += f"\n[监听记忆] {summary_text}"
+                write_json_file(robot.memory.memory_file, robot.memory.memory)
+                logger.info("监听总结已同步到长期记忆")
+        except Exception as e:
+            logger.debug(f"同步到长期记忆失败（不影响主流程）: {e}")
+
     def clear_pool(self):
-        """清空监听池，重置计数器"""
         with self._lock:
             self.summary_manager.clear()
             self.total_word_count = 0
